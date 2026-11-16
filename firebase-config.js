@@ -1,12 +1,6 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+// Firebase settings for the Implant Product Register. Keep exactly this shape: window.FIREBASE_CONFIG = { ... };
+// No import lines, no initializeApp: firebase-adapter.js does that.
+window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyDKgk68l20g3x6l4v4mwDUqmnsJEs_OAgQ",
   authDomain: "dhh-register.firebaseapp.com",
   projectId: "dhh-register",
@@ -15,7 +9,3 @@ const firebaseConfig = {
   appId: "1:631707050354:web:ccf7c622aad86698a1bdeb",
   measurementId: "G-R1RTP4EPYZ"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
