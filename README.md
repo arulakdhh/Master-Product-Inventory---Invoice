@@ -1,94 +1,49 @@
-# Implant Product Register — source code
+# Implant Product Register — GitHub Pages + Firebase
 
-The web app that stores supplier invoice lines, issues permanent DHH Product IDs (PIDs) by division, tracks stock, and makes quotations, delivery challans and tax invoices for Dr Han Health Care Pvt Ltd.
+This is the same app as the claude.ai version, set up to run on GitHub Pages. The data lives in **Google Firebase (Firestore)**, and people sign in with their Google account.
 
-Live copy: the "Implant Product Register" artifact on claude.ai (private to its owner).
+GitHub Pages only hosts the files. Firebase holds the data and decides who can see it. Both are free at this size.
 
-## Folder layout
+## Part 1 — Create the database (Firebase, about 10 minutes)
 
-| Path | What it is |
+1. **Create a project.** Go to https://console.firebase.google.com, click **Add project**, give it a name (e.g. `dhh-register`), and finish the steps (you can turn Google Analytics off).
+2. **Create the database.** Under **Build → Firestore Database**, click **Create database**. Choose location **asia-south1 (Mumbai)**, then **Start in production mode**.
+3. **Set who can use it.** In **Firestore Database → Rules**, delete what's there and paste the contents of `firestore.rules` from this folder. Replace `YOUR_EMAIL@gmail.com` with your Google email (add more emails for colleagues), then click **Publish**.
+4. **Turn on Google sign-in.** Under **Build → Authentication → Get started → Sign-in method → Google**, switch it to Enable, choose a support email, and click **Save**.
+5. **Register the web app.** Go to **Project settings** (gear icon) → **Your apps** → click the **</>** (Web) icon, give it a name, and click **Register app**. Copy the `firebaseConfig` values shown into `firebase-config.js` in this folder, replacing the placeholders.
+
+## Part 2 — Put it on GitHub (about 5 minutes)
+
+1. **Create the repository.** At https://github.com/new, name it (e.g. `dhh-register`). With a free GitHub account, Pages needs the repository to be **Public**. That's fine: the code and Firebase settings are not secret, and your data stays protected by the Firestore rules.
+2. **Upload the files.** Click **uploading an existing file**, drag in **everything in this folder** (including `lib/` and `.nojekyll`), then click **Commit changes**.
+   - Don't upload backup `.json` files or invoice Excel/PDF files to a public repository.
+3. **Turn on Pages.** Go to **Settings → Pages → Build and deployment**: Source **Deploy from a branch**, Branch **main**, folder **/ (root)**, then **Save**. After a minute your site is at `https://YOUR-USERNAME.github.io/dhh-register/`.
+4. **Allow sign-in from GitHub.** Back in Firebase, go to **Authentication → Settings → Authorized domains → Add domain** and add `YOUR-USERNAME.github.io`.
+
+## Part 3 — Move your data across
+
+1. In the **claude.ai** register, open **Export & connect → Download full backup**.
+2. Open your GitHub site, sign in, go to **Export & connect → Restore from backup…** and choose that file.
+
+Everything comes across: invoices, PIDs, counters, retired PIDs, sales documents, customers and company details. Restore only works into an empty register, so it can't overwrite anything.
+
+After moving, use **one** copy (claude.ai or GitHub) for new work. They don't sync with each other.
+
+## Files
+
+| File | Purpose |
 |---|---|
-| `app/index.html` | The whole app: page layout, styles, PID creation, product lists, analysis, invoice import, exports, database wiring |
-| `app/sales.js` | Sales & stock: quotations, delivery challans, tax invoices, customers, company details, PDF output, sales exports |
-| `app/parser.js` | Reads the Meril invoice PDF layout and returns header, lines and printed totals. Used in the browser and in Node |
-| `app/seed.json` | The two invoices extracted first (9426313394 and 9426313395, 1,154 lines). Loaded by the "Load 1,154 lines" button |
-| `app/lib/` | Third-party libraries, unchanged: pdf.js 3.11.174 (reads PDFs), jsPDF 2.5.1 and jsPDF-AutoTable 3.8.2 (make PDFs). SheetJS 0.18.5 (Excel) loads from cdnjs |
-| `database/schema.sql` | The same data as MySQL tables, plus a `stock_by_pid` view |
-| `tools/extract_invoice_pdf.py` | The Python extractor used to make the first Excel files (`python3 extract_invoice_pdf.py invoice.txt`, where the .txt comes from `pdftotext -layout`) |
-| `tools/build_invoice_excel.py` | The script that built `Invoice_…_Product_Details.xlsx` (needs `openpyxl`; written for invoice 9426313395, so change the header/footer values for another invoice) |
-| `local-testing/mock-db.js` | A fake in-memory database, so you can open the app locally without claude.ai (see below) |
+| `index.html`, `sales.js`, `parser.js` | The app (same code as claude.ai) |
+| `firebase-config.js` | **Edit this:** your Firebase project settings |
+| `firebase-adapter.js` | Connects the app to Firestore and Google sign-in |
+| `firestore.rules` | **Edit and paste into Firebase:** who may read/write |
+| `lib/` | PDF reader and PDF maker libraries |
+| `.nojekyll` | Tells GitHub Pages to serve the files as they are |
 
-## How the database works
+## Updating later
 
-The live app uses the **claude.ai artifact database**. It's a document store (JSON documents at slash-separated paths, similar to Firebase Firestore). The page reaches it through `await claude.use("db")`, and claude.ai provides that only when the page runs inside claude.ai. There is no server code and no SQL inside the live app.
+Edit a file on GitHub (pencil icon) or upload a new version. The site updates within a minute. Your data in Firebase is not affected.
 
-Access rule declared on the artifact: everyone you share with can read, and only you (the owner) and Editors can write:
+## Connecting your own website
 
-```json
-{ "db": { "rules": [ { "path": "", "read": "view", "write": "admin" } ] }, "user": {}, "downloads": true }
-```
-
-### Collections and documents
-
-| Path | Contents |
-|---|---|
-| `invoices/{invoiceNo}` | Invoice header: date, supplier, buyer, GSTINs, printed footer totals, `rowCount`, `chunkCount`, `sourceFile`, `importedAt`, `removedLines[]` |
-| `chunks/{invoiceNo}_{000}` | `{invoiceNo, k, rows:[…]}`, up to 100 invoice lines per document (documents are capped at 256 KB). Each row: `sr, hsn, mat, desc, batch, serial, exp, uom, qty, mrp, rate, basic, disc, freight, taxable, igstRate, igst` |
-| `registry/{invoiceNo}` | PIDs for that invoice: `{division, lines:{ "<sr>": {div, id, mat, batch, serial, issuedAt} }, retired:[…]}`. Kept separate from `chunks` so that re-importing an invoice never changes its PIDs |
-| `settings/divisions` | `{list:[{code,name}]}`. Default: MLS, MHC, MED, MDG |
-| `settings/counters` | `{counts:{MLS:n, MHC:n, …}}`. Last PID number per division. Only ever goes up |
-| `sales/{TYPE}_{FY}_{SEQ}` | A quotation, challan or invoice: `type, no, date, status, customer{}, extra[], notes, lines[], totals{}, intra, fromDc, refId, refNo, company{}` (a copy of the company details at the time) |
-| `customers/{id}` | Saved customers |
-| `settings/company` | Company details printed on documents |
-| `settings/salescounters` | `{counts:{"INV_26-27":n, "QTN_26-27":n, "DC_26-27":n}}` |
-| `presets/{id}` | Saved column sets (e.g. a Tally layout) |
-
-### Rules the code enforces
-
-- **PIDs** are `division code + number` with at least 2 digits (MLS01 … MLS99, MLS100). Issuing takes a lease on `settings/counters`, so two devices can't take the same number. The counter is written *before* the registry, so a failure leaves a gap and never a duplicate. Deleting lines or invoices moves their PIDs to `retired[]`; they're never reused.
-- **Stock**: available = received − sold. A sales line reduces stock if it's on a challan that isn't cancelled, or on an active invoice not made from a challan (`lineDeducts()` in `sales.js`). Saving checks availability; serial-numbered items are limited to qty 1. You can't delete purchase lines that are already sold.
-- **Document numbers**: `DHH/{FY}/0001`, `DHH/QTN/{FY}/0001`, `DHH/DC/{FY}/0001`. FY runs April–March (`fyOf()` in `sales.js`). Issued under a lease on `settings/salescounters`.
-- **GST**: if the customer's state code equals the company's (33, Tamil Nadu), use CGST + SGST at half the rate each; otherwise IGST.
-
-## Running it on your own server
-
-The app is plain HTML and JavaScript with no build step. Every database call is in two places:
-
-- `index.html`: the `boot` block at the end (subscriptions), plus `saveInvoice`, `deleteInvoice`, `retirePids`, `deleteLines`, `createPids`, presets, divisions
-- `sales.js`: `nextNumber`, `saveDoc`, `cancelDoc`, `saveCompany`, `deleteCustomer`
-
-They all use one small interface:
-
-```js
-db.doc(path).set(obj) / .get() / .delete() / .onSnapshot(cb) / .acquire({holder, ttlMs})
-db.collection(path).onSnapshot(cb)      // cb gets {docs:[{id, data()}], metadata:{fromCache}}
-```
-
-To run it outside claude.ai, provide a `window.claude` object whose `use("db")` returns something with that interface:
-
-- **Firebase Firestore**: almost one-to-one (`doc`, `collection`, `set`, `get`, `onSnapshot`). Replace `acquire` with a Firestore transaction on the counter document.
-- **Supabase or your own PHP/Node + MySQL API**: implement `set/get/delete` as REST calls to a table `documents(path VARCHAR PRIMARY KEY, data JSON)`. Implement `onSnapshot` as a poll every few seconds (or Supabase realtime). Implement `acquire` as `SELECT … FOR UPDATE` on the counter row. Or move to the relational tables in `database/schema.sql` and change the functions listed above.
-- `use("downloads")` must return `{save({filename, data})}`; in a normal browser that can be a Blob plus `<a download>`.
-- `use("user")` can return `null`.
-
-`local-testing/mock-db.js` is a working example of that interface, held in memory.
-
-### Try it locally
-
-Add one line to `app/index.html`, just before `<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/…">`:
-
-```html
-<script src="../local-testing/mock-db.js"></script>
-```
-
-Then, from this folder (the one containing `app/` and `local-testing/`):
-
-```bash
-python3 -m http.server 8000
-```
-
-and open http://localhost:8000/app/index.html. Data disappears when you reload, so this is for testing only.
-
-## Connecting your live website today
-
-Without changing anything, use **Export & connect → Download SQL (MySQL)** in the app. Rename `.sql.txt` to `.sql` and import it with phpMyAdmin. It creates and updates `invoices`, `invoice_items` (with PID, division, sold and available quantities), `sales_documents` and `sales_items`. Re-importing replaces rows instead of duplicating them.
+Your site can read the same Firestore database with the Firebase SDK (same project, same rules), or you can use **Download SQL (MySQL)** in the app as before.

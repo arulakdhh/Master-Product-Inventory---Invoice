@@ -211,7 +211,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
   <section id="tab-export" class="hidden" style="display:grid;gap:14px">
     <div class="panel pad">
       <h2>Use this data in your own website or app</h2>
-      <p class="note">This register is a private page on claude.ai, so your website can't read it live over the internet. Download one of these files and import it into your site's database. Download again after you add invoices here. The SQL file creates two tables, <code>invoices</code> and <code>invoice_items</code>. It works with MySQL/MariaDB and needs only small changes for PostgreSQL.</p>
+      <p class="note">Your website can also read the Firebase database directly, or use these files. Download one of these files and import it into your site's database. Download again after you add invoices here. The SQL file creates two tables, <code>invoices</code> and <code>invoice_items</code>. It works with MySQL/MariaDB and needs only small changes for PostgreSQL.</p>
       <div class="row">
         <button class="btn primary" data-exp="sql">Download SQL (MySQL)</button>
         <button class="btn" data-exp="json">Download JSON (all data)</button>
@@ -219,6 +219,15 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
         <button class="btn" data-exp="xlsxall">Download Excel (lines + master + invoices)</button>
       </div>
       <div id="expmsg" style="margin-top:10px"></div>
+    </div>
+    <div class="panel pad">
+      <h2>Full backup and restore</h2>
+      <p class="note">A full backup is one file with everything: invoices, PIDs and their counters, retired PIDs, sales documents, customers, company details and saved column sets. Use it to keep a safe copy, or to move the register to another database (for example the GitHub + Firebase version). Restoring only works into an empty register, so it can never overwrite data.</p>
+      <div class="row">
+        <button class="btn primary" id="btnBackup">Download full backup</button>
+        <button class="btn" id="btnRestore">Restore from backup…</button><input type="file" id="restoreFile" accept=".json" hidden>
+      </div>
+      <div id="bkmsg" style="margin-top:10px"></div>
     </div>
     <div class="panel pad">
       <h2>For Tally and analysis</h2>
@@ -231,6 +240,12 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
   </section>
 </main>
 
+<!-- Firebase (GitHub Pages version): database + Google sign-in -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="firebase-adapter.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="lib/pdf.min.js"></script>
 <script src="parser.js"></script>
@@ -475,7 +490,7 @@ function totalsOk(t,f){ if(!f) return null; return Math.abs(t.basic-f.basic)<0.0
 
 /* ---------- invoices tab ---------- */
 function renderInvoices(){
-  $("seedBox").hidden = !(S.loaded && S.db && !Object.keys(S.invoices).length && S.canWrite);
+  $("seedBox").hidden = !(S.loaded && S.db && !Object.keys(S.invoices).length && S.canWrite && S.hasSeed);
   const inv=Object.values(S.invoices).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1);
   $("invtbl").tHead.innerHTML="<tr><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Buyer</th><th class='num'>Lines</th><th class='num'>Taxable (₹)</th><th class='num'>IGST (₹)</th><th class='num'>Invoice value (₹)</th><th>Division</th><th class='num'>PIDs</th><th>Check</th><th>Source</th><th></th></tr>";
   $("invtbl").tBodies[0].innerHTML = inv.length? inv.map(i=>{ const L=S.items.filter(r=>r.invoiceNo===i.invoiceNo);
@@ -667,6 +682,37 @@ $("btnDelPreset").onclick=async()=>{ const id=S.tab==="master"?S.presetMaster:S.
 $("btnCsv").onclick=()=>save(`${viewName()}_${stamp()}.csv`, csv(tableAoA()));
 $("btnXlsx").onclick=()=>save(`${viewName()}_${stamp()}.xlsx`, xlsxFrom([[S.tab==="master"?"Product master":"Invoice lines", tableAoA()]]));
 $("btnCopy").onclick=async e=>{ const t=tableAoA().map(r=>r.join("\t")).join("\n"); try{ await navigator.clipboard.writeText(t); e.target.textContent="Copied ✓"; }catch{ e.target.textContent="Copy blocked"; } setTimeout(()=>e.target.textContent="Copy",1600); };
+/* ---------- full backup / restore ---------- */
+const BACKUP_SETTINGS=["settings/divisions","settings/counters","settings/company","settings/salescounters"];
+async function makeBackup(){
+  const docs={};
+  for(const [id,d] of Object.entries(S.invoices)) docs["invoices/"+id]=d;
+  for(const [id,d] of Object.entries(S.chunks)) docs["chunks/"+id]=d;
+  for(const [id,d] of Object.entries(S.registry)) docs["registry/"+id]=d;
+  for(const [id,d] of Object.entries(S.sales||{})) docs["sales/"+id]=d;
+  for(const [id,d] of Object.entries(S.customers||{})) docs["customers/"+id]=d;
+  for(const p of S.presets){ const {id,...d}=p; docs["presets/"+id]=d; }
+  for(const p of BACKUP_SETTINGS){ const g=await S.db.doc(p).get(); if(g.exists) docs[p]=g.data(); }
+  return {app:"implant-product-register",version:1,exportedAt:new Date().toISOString(),count:Object.keys(docs).length,docs};
+}
+$("btnBackup").onclick=async()=>{ if(!S.db){ msg($("bkmsg"),"bad","The database isn't connected."); return; }
+  try{ const b=await makeBackup(); await save(`implant_register_backup_${stamp()}.json`, JSON.stringify(b)); msg($("bkmsg"),"good",`Backup has ${b.count} records.`); }
+  catch(e){ msg($("bkmsg"),"bad","Backup failed: "+(e.message||e.code)); } };
+$("btnRestore").onclick=()=>$("restoreFile").click();
+$("restoreFile").onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; const m=$("bkmsg");
+  try{
+    const b=JSON.parse(await f.text());
+    if(b.app!=="implant-product-register"||!b.docs) throw new Error("this isn't a register backup file");
+    if(Object.keys(S.invoices).length||Object.keys(S.sales||{}).length) throw new Error("this register already has data. Restore only works into an empty register");
+    const paths=Object.keys(b.docs).filter(p=>/^[A-Za-z0-9_\-.~:@+]+\/[A-Za-z0-9_\-.~:@+]+$/.test(p));
+    // settings and registry first, invoice headers last, so lines never show without their PIDs
+    const order=p=>p.startsWith("settings/")?0:p.startsWith("registry/")?1:p.startsWith("chunks/")?2:p.startsWith("invoices/")?4:3;
+    paths.sort((a,c)=>order(a)-order(c));
+    let n=0; for(const p of paths){ await S.db.doc(p).set(b.docs[p]); n++; if(n%10===0) msg(m,"warn",`Restoring… ${n} of ${paths.length}`); }
+    msg(m,"good",`Restored ${n} records from the backup of ${b.exportedAt||""}.`);
+  }catch(err){ msg(m,"bad","Restore failed: "+(err.message||err)); } };
+fetch("seed.json",{method:"HEAD"}).then(r=>r.ok||fetch("seed.json").then(x=>x.ok)).then(ok=>{ S.hasSeed=!!ok; render(); }).catch(()=>{ S.hasSeed=false; });
+
 $("btnSeed").onclick=async()=>{ const b=$("btnSeed"); b.disabled=true;
   try{ const seed=await (await fetch("seed.json")).json();
     for(const [i,s] of seed.entries()){ b.textContent=`Saving invoice ${i+1} of ${seed.length}…`; await saveInvoice(s,true); }
@@ -716,7 +762,7 @@ $("btnAddDiv").onclick=async()=>{
 /* ---------- boot ---------- */
 render();
 (async()=>{
-  if(!window.claude||!claude.use){ setStatus("err","Database unavailable outside claude.ai"); S.loaded=true; render(); return; }
+  if(!window.claude||!claude.use){ setStatus("err","Database not connected"); S.loaded=true; render(); return; }
   claude.use("downloads").then(d=>{downloads=d;}).catch(()=>{});
   claude.use("user").then(async u=>{ try{ const c=u&&u.can?await u.can("data.write"):null; if(c===false){ S.canWrite=false; render(); } }catch{} }).catch(()=>{});
   const db=await claude.use("db");
