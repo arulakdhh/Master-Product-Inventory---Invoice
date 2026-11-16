@@ -1,10 +1,21 @@
-// Paste your Firebase web app settings here (Firebase console → Project settings → Your apps → Web app → SDK setup and configuration → Config).
-// These values are not secret; your data is protected by the Firestore rules (firestore.rules), not by hiding this file.
-window.FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000"
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDKgk68l20g3x6l4v4mwDUqmnsJEs_OAgQ",
+  authDomain: "dhh-register.firebaseapp.com",
+  projectId: "dhh-register",
+  storageBucket: "dhh-register.firebasestorage.app",
+  messagingSenderId: "631707050354",
+  appId: "1:631707050354:web:ccf7c622aad86698a1bdeb",
+  measurementId: "G-R1RTP4EPYZ"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
