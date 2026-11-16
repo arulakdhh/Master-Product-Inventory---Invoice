@@ -38,6 +38,12 @@ h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balan
 nav.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto}
 nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+nav.tabs{flex-wrap:wrap}
+nav.subtabs{display:flex;gap:6px;padding:8px 0 10px;flex-wrap:wrap}
+nav.subtabs:empty{display:none}
+nav.subtabs button{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:4px 12px;cursor:pointer;font-size:13px;color:var(--muted)}
+nav.subtabs button[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.viewonly{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:var(--warn-soft);color:var(--warn);margin-left:6px}
 main{padding:16px 20px 40px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
 main>*,.grid2>*,main section>*{min-width:0}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}
@@ -120,15 +126,8 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
     <span class="sub" id="subline">Product lines from supplier invoices</span>
     <span class="status"><span class="dot" id="dbdot"></span><span id="dbstatus">Connecting to database…</span></span>
   </div>
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="pid" aria-selected="true">PID creation</button>
-    <button role="tab" data-tab="lines" aria-selected="false">All lines</button>
-    <button role="tab" data-tab="master" aria-selected="false">Product master</button>
-    <button role="tab" data-tab="sales" aria-selected="false">Sales &amp; stock</button>
-    <button role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
-    <button role="tab" data-tab="invoices" aria-selected="false">Invoices &amp; import</button>
-    <button role="tab" data-tab="export" aria-selected="false">Export &amp; connect</button>
-  </nav>
+  <nav class="tabs" role="tablist" id="panelnav" aria-label="Panels"></nav>
+  <nav class="subtabs" id="subnav" aria-label="Sections"></nav>
 </header>
 
 <main>
@@ -193,6 +192,19 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 
   <section id="tab-sales" class="hidden" style="display:grid;gap:14px"></section>
 
+  <section id="tab-po" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-supply" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-payfollow" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-payrecv" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-company" class="hidden" style="display:grid;gap:14px">
+    <div class="panel pad" id="companyBox"></div>
+  </section>
+  <section id="tab-customers" class="hidden" style="display:grid;gap:14px">
+    <div class="panel pad" id="customerBox"></div>
+  </section>
+  <section id="tab-users" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-noaccess" class="hidden"><div class="panel pad empty" id="noaccessMsg">Checking your access…</div></section>
+
   <section id="tab-analysis" class="hidden" style="display:grid;gap:14px"></section>
 
   <section id="tab-invoices" class="hidden" style="display:grid;gap:14px">
@@ -222,7 +234,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
     </div>
     <div class="panel pad">
       <h2>Full backup and restore</h2>
-      <p class="note">A full backup is one file with everything: invoices, PIDs and their counters, retired PIDs, sales documents, customers, company details and saved column sets. Use it to keep a safe copy, or to move the register to another database (for example the GitHub + Firebase version). Restoring only works into an empty register, so it can never overwrite data.</p>
+      <p class="note">A full backup is one file with everything: invoices, PIDs and their counters, retired PIDs, purchase orders, sales documents, receipts, follow-ups, customers, users and access, company details and saved column sets. Use it to keep a safe copy, or to move the register to another database (for example the GitHub + Firebase version). Restoring only works into an empty register, so it can never overwrite data.</p>
       <div class="row">
         <button class="btn primary" id="btnBackup">Download full backup</button>
         <button class="btn" id="btnRestore">Restore from backup…</button><input type="file" id="restoreFile" accept=".json" hidden>
@@ -245,7 +257,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=2"></script>
-<script src="firebase-adapter.js?v=2"></script>
+<script src="firebase-adapter.js?v=3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="lib/pdf.min.js"></script>
 <script src="parser.js"></script>
@@ -377,8 +389,9 @@ function activeCols(){ const F=fieldsFor(S.tab==="master"?"master":"lines"); con
 
 /* ---------- render table ---------- */
 function render(){
-  if(S.tab==="pid") return renderPid();
-  if(S.tab==="sales") return (typeof renderSales==="function") && renderSales();
+  if(typeof renderOps==="function" && renderOps()) return;
+  if(S.tab==="pid"){ renderPid(); renderInvoices(); return; }
+  if(S.tab.startsWith("sales")) return (typeof renderSales==="function") && renderSales();
   if(S.tab==="analysis") return renderAnalysis();
   if(S.tab==="invoices") return renderInvoices();
   if(S.tab==="export") return;
@@ -654,18 +667,11 @@ async function savePreset(name){ const view=S.tab==="master"?"master":"lines"; c
   catch(e){ $("presetNote").textContent="Couldn't save: "+(e.message||e.code); } }
 
 /* ---------- events ---------- */
-document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
-  S.tab=b.dataset.tab; S.page=0; S.sort=null;
-  $("tab-table").classList.toggle("hidden",!["lines","master"].includes(S.tab));
-  ["pid","sales","analysis","invoices","export"].forEach(t=>$("tab-"+t).classList.toggle("hidden",S.tab!==t));
-  $("fMatch").parentElement.classList.toggle("hidden",S.tab==="master");
-  render();
-});
+/* panel navigation lives in ops.js (setView) */
 ["q","fInvoice","fHsn","fExp","fMatch","fDiv","fId","fStock"].forEach(id=>$(id).addEventListener("input",()=>{S.page=0;render();}));
 $("prev").onclick=()=>{S.page--;render();}; $("next").onclick=()=>{S.page++;render();};
 $("tbl").tHead.onclick=e=>{const th=e.target.closest("th"); if(!th||!th.dataset.k) return; const k=th.dataset.k; S.sort = S.sort&&S.sort.k===k ? (S.sort.dir>0?{k,dir:-1}:null) : {k,dir:1}; render();};
-document.addEventListener("click",e=>{ const c=e.target.closest("[data-code]"); if(c){ $("q").value=c.dataset.code; if(S.tab==="analysis"){ document.querySelector('[data-tab="lines"]').click(); } S.page=0; render(); }
+document.addEventListener("click",e=>{ const c=e.target.closest("[data-code]"); if(c){ $("q").value=c.dataset.code; if(S.tab!=="lines"&&S.tab!=="master"&&typeof setView==="function"){ setView("inventory","lines"); } S.page=0; render(); }
   const d=e.target.closest("[data-del]"); if(d){ const no=d.dataset.del; if(d.dataset.confirm){ d.disabled=true; d.textContent="Deleting…"; removeInvoice(no).then(n=>msg($("globalmsg"),"good",`Deleted invoice ${no}.`+(n?` ${n} PIDs retired.`:""))).catch(err=>{ d.disabled=false; msg($("globalmsg"),"bad","Delete failed: "+(err.message||err.code)); }); } else { const t0=d.textContent; d.dataset.confirm="1"; d.textContent="Click again to delete invoice "+no; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.confirm; d.textContent=t0; } },4000);} }
   const x=e.target.closest("[data-exp]"); if(x) doExport(x.dataset.exp);
 });
@@ -692,6 +698,7 @@ async function makeBackup(){
   for(const [id,d] of Object.entries(S.sales||{})) docs["sales/"+id]=d;
   for(const [id,d] of Object.entries(S.customers||{})) docs["customers/"+id]=d;
   for(const p of S.presets){ const {id,...d}=p; docs["presets/"+id]=d; }
+  for(const [col,key] of [["purchaseOrders","pos"],["receipts","receipts"],["followups","followups"],["users","users"]]) for(const [id,d] of Object.entries(S[key]||{})) docs[col+"/"+id]=d;
   for(const p of BACKUP_SETTINGS){ const g=await S.db.doc(p).get(); if(g.exists) docs[p]=g.data(); }
   return {app:"implant-product-register",version:1,exportedAt:new Date().toISOString(),count:Object.keys(docs).length,docs};
 }
@@ -706,7 +713,7 @@ $("restoreFile").onchange=async e=>{ const f=e.target.files[0]; e.target.value="
     if(Object.keys(S.invoices).length||Object.keys(S.sales||{}).length) throw new Error("this register already has data. Restore only works into an empty register");
     const paths=Object.keys(b.docs).filter(p=>/^[A-Za-z0-9_\-.~:@+]+\/[A-Za-z0-9_\-.~:@+]+$/.test(p));
     // settings and registry first, invoice headers last, so lines never show without their PIDs
-    const order=p=>p.startsWith("settings/")?0:p.startsWith("registry/")?1:p.startsWith("chunks/")?2:p.startsWith("invoices/")?4:3;
+    const order=p=>p.startsWith("users/")?-1:p.startsWith("settings/")?0:p.startsWith("registry/")?1:p.startsWith("chunks/")?2:p.startsWith("invoices/")?4:3;
     paths.sort((a,c)=>order(a)-order(c));
     let n=0; for(const p of paths){ await S.db.doc(p).set(b.docs[p]); n++; if(n%10===0) msg(m,"warn",`Restoring… ${n} of ${paths.length}`); }
     msg(m,"good",`Restored ${n} records from the backup of ${b.exportedAt||""}.`);
@@ -777,11 +784,12 @@ render();
   db.doc("settings/divisions").onSnapshot(d=>{ if(d.exists&&Array.isArray(d.data().list)&&d.data().list.length) S.divisions=d.data().list.slice(); soon(); }, ()=>{});
   db.doc("settings/counters").onSnapshot(d=>{ S.counters=(d.exists&&d.data().counts)||{}; renderIdBar(); }, ()=>{});
   db.collection("sales").onSnapshot(s=>{ S.sales={}; s.docs.forEach(d=>S.sales[d.id]=d.data()); soon(); }, ()=>{});
-  db.collection("customers").onSnapshot(s=>{ S.customers={}; s.docs.forEach(d=>S.customers[d.id]=d.data()); if(S.tab==="sales") renderSales(); }, ()=>{});
+  db.collection("customers").onSnapshot(s=>{ S.customers={}; s.docs.forEach(d=>S.customers[d.id]=d.data()); if(S.tab.startsWith("sales")||S.tab==="customers") render(); }, ()=>{});
   db.doc("settings/company").onSnapshot(d=>{ if(d.exists) S.company={...S.company,...d.data()}; }, ()=>{});
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js"></script>
+<script src="sales.js?v=5"></script>
+<script src="ops.js?v=1"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@ const DOC_TYPES = {
   INV: { name: "Tax Invoice", short: "Invoice", title: "TAX INVOICE", prefix: "DHH/", deducts: true },
   QTN: { name: "Quotation", short: "Quotation", title: "QUOTATION", prefix: "DHH/QTN/", deducts: false },
   DC:  { name: "Delivery Challan", short: "Challan", title: "DELIVERY CHALLAN", prefix: "DHH/DC/", deducts: true },
+  SO:  { name: "Sales Order", short: "Order", title: "SALES ORDER", prefix: "DHH/SO/", deducts: false },
+  PO:  { name: "Purchase Order", short: "PO", title: "PURCHASE ORDER", prefix: "DHH/PO/", deducts: false },
 };
 const STATES = {"01":"Jammu & Kashmir","02":"Himachal Pradesh","03":"Punjab","04":"Chandigarh","05":"Uttarakhand","06":"Haryana","07":"Delhi","08":"Rajasthan","09":"Uttar Pradesh","10":"Bihar","11":"Sikkim","12":"Arunachal Pradesh","13":"Nagaland","14":"Manipur","15":"Mizoram","16":"Tripura","17":"Meghalaya","18":"Assam","19":"West Bengal","20":"Jharkhand","21":"Odisha","22":"Chhattisgarh","23":"Madhya Pradesh","24":"Gujarat","26":"Dadra & Nagar Haveli and Daman & Diu","27":"Maharashtra","29":"Karnataka","30":"Goa","31":"Lakshadweep","32":"Kerala","33":"Tamil Nadu","34":"Puducherry","35":"Andaman & Nicobar","36":"Telangana","37":"Andhra Pradesh","38":"Ladakh"};
 const DEFAULT_LOGO = "data:image/png;base64,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";
@@ -15,6 +17,7 @@ const DEFAULT_COMPANY = {
   termsQuote: "Payment: 100% advance along with Purchase Order.\nWarranty: 2 years.\nGST: As shown above.\nValidity: Proposal valid up to 30 days from the date of issue.\nAfter Sales Service: Provided by well-trained engineers based on your territory.",
   termsInvoice: "Payment: Due on receipt of invoice.\nGoods once sold will not be taken back.\nJurisdiction: Subject to Chennai jurisdiction.",
   termsDc: "Goods sent for use; to be billed separately.\nPlease sign and return a copy of this challan.",
+  termsPo: "Delivery: To our Chennai address within the agreed time.\nBilling: Please quote this PO number on your invoice.\nGST: As applicable.",
   closing: "We look forward to your long-term association. Please contact us for any clarification.",
   signatory: "Authorised Signatory", logo: DEFAULT_LOGO
 };
@@ -32,9 +35,11 @@ function lineDeducts(doc) {
   if (doc.type === "INV") return !doc.fromDc;
   return false;
 }
+const isOrderType = t => t === "QTN" || t === "SO";
+const dcPending = l => r2((l.qty || 0) - (l.billedQty || 0) - (l.returnedQty || 0));
 function soldMap(exceptId) {
   const m = {};
-  for (const [id, d] of Object.entries(S.sales)) { if (id === exceptId || !lineDeducts(d)) continue; for (const l of d.lines || []) m[l.key] = (m[l.key] || 0) + l.qty; }
+  for (const [id, d] of Object.entries(S.sales)) { if (id === exceptId || !lineDeducts(d)) continue; for (const l of d.lines || []) { const q = d.type === "DC" ? r2((l.qty || 0) - (l.returnedQty || 0)) : l.qty; m[l.key] = (m[l.key] || 0) + q; } }
   return m;
 }
 function computeStock(items) { const m = soldMap(); for (const r of items) { r.soldQty = m[r.key] || 0; r.availQty = r2(r.qty - r.soldQty); } }
@@ -70,18 +75,19 @@ const isIntra = c => { const s = custState(c); return !s || s === (S.company.sta
 /* ---------- editor ---------- */
 function newDoc(type, from) {
   const vu = new Date(); vu.setDate(vu.getDate() + 30);
-  S.ed = { opts: { hospOn: false, hospPct: "", surgOn: false, surgPct: "", gstOn: false, gstPct: "" }, validUntil: type === "QTN" ? vu.toISOString().slice(0, 10) : "", yourRef: "", preparedBy: "", type, date: todayIso(), customerId: "", cust: { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }, extra: [{ label: "", value: "" }], lines: [], notes: "", refQtn: "", refDc: "", fromDc: false, editingId: "" };
+  S.ed = { opts: { hospOn: false, hospPct: "", surgOn: false, surgPct: "", gstOn: false, gstPct: "" }, validUntil: type === "QTN" ? vu.toISOString().slice(0, 10) : "", yourRef: "", preparedBy: "", type, date: todayIso(), customerId: "", cust: { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }, extra: [{ label: "", value: "" }], lines: [], notes: "", refQtn: "", refDc: "", fromDc: false, editingId: "", creditDays: 30 };
   if (from) {
     const src = S.sales[from];
     S.ed.cust = { ...src.customer }; S.ed.customerId = src.customerId || ""; S.ed.extra = (src.extra || []).map(x => ({ ...x })); if (!S.ed.extra.length) S.ed.extra = [{ label: "", value: "" }];
     S.ed.lines = src.lines.map(l => ({ ...l })); S.ed.notes = src.notes || ""; S.ed.opts = { ...S.ed.opts, ...(src.opts || {}) }; if (!("gstOn" in (src.opts || {}))) { const g = (src.lines[0] || {}).gstRate || 0; S.ed.opts.gstOn = g > 0; S.ed.opts.gstPct = g || ""; } S.ed.yourRef = src.yourRef || ""; S.ed.preparedBy = src.preparedBy || "";
-    if (src.type === "QTN") S.ed.refQtn = from;
-    if (src.type === "DC") { S.ed.refDc = from; S.ed.fromDc = true; }
+    if (isOrderType(src.type)) S.ed.refQtn = from;
+    if (src.type === "DC") { S.ed.refDc = from; S.ed.fromDc = true; S.ed.lines = src.lines.map((l, i) => ({ ...l, dcIdx: i, dcPending: dcPending(l), qty: dcPending(l) })).filter(l => l.dcPending > 0); }
+    if (type === "INV") { const c = S.customers[S.ed.customerId]; S.ed.creditDays = c && c.creditDays != null ? c.creditDays : 30; }
   }
   renderSales(); setTimeout(() => document.getElementById("edDate")?.scrollIntoView({ block: "center" }), 30);
 }
 function editQuotation(id) {
-  const src = S.sales[id]; newDoc("QTN", null);
+  const src = S.sales[id]; newDoc(src.type, null);
   Object.assign(S.ed, { opts: { ...S.ed.opts, ...(src.opts || {}), ...(("gstOn" in (src.opts || {})) ? {} : { gstOn: ((src.lines[0] || {}).gstRate || 0) > 0, gstPct: (src.lines[0] || {}).gstRate || "" }) }, validUntil: src.validUntil || "", yourRef: src.yourRef || "", preparedBy: src.preparedBy || "", editingId: id, date: src.date, cust: { ...src.customer }, customerId: src.customerId || "", extra: (src.extra || []).map(x => ({ ...x })), lines: src.lines.map(l => ({ ...l })), notes: src.notes || "" });
   if (!S.ed.extra.length) S.ed.extra = [{ label: "", value: "" }];
   renderSales();
@@ -97,65 +103,72 @@ function addLine(key) {
 function edMsg(t, kind = "warn") { const el = document.getElementById("edMsg"); if (el) { el.className = "msg " + kind; el.textContent = t; el.classList.remove("hidden"); } }
 
 /* ---------- render ---------- */
+const SALES_MODES = {
+  "sales-inv": { types: ["INV"], title: "Sales tax invoices", note: "Tax invoices reduce stock when saved (unless billed from a challan, whose stock is already out). Cancelling returns the stock.", buttons: [["INV", "New tax invoice"]] },
+  "sales-dc": { types: ["DC"], title: "Dispatch: delivery challans", note: "A challan reduces stock when the goods leave. Bill used items and return unused ones from here or from Supply & Goods.", buttons: [["DC", "New delivery challan"]] },
+  "sales-so": { types: ["QTN", "SO"], title: "Sell orders: quotations and hospital orders", note: "Quotations and sales orders don't change stock. Convert them to a challan (Dispatch) or a tax invoice (Invoice).", buttons: [["SO", "New sales order"], ["QTN", "New quotation"]] },
+};
+const panelOfType = t => t === "INV" ? "invoice" : t === "DC" ? "dispatch" : t === "PO" ? "po" : "sellorder";
+const canType = t => typeof canEditPanel === "function" ? canEditPanel(panelOfType(t)) : S.canWrite;
+function salesMode() { return SALES_MODES[S.tab] || { types: ["INV", "QTN", "SO", "DC"], title: "Sales", note: "", buttons: [["INV", "New tax invoice"]] }; }
 function renderSales() {
-  const el = $("tab-sales"); if (!el) return;
-  if (!el.dataset.built) {
-    el.dataset.built = "1";
+  const el = $("tab-sales"); if (!el) return; const md = salesMode();
+  if (el.dataset.mode !== S.tab) {
+    if (el.dataset.mode && S.ed && !md.types.includes(S.ed.type)) { S.ed = null; S.salesView = null; }
+    el.dataset.mode = S.tab;
     el.innerHTML = `
     <div class="panel pad">
       <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Sales &amp; stock</h2>
-        <div class="row">
-          <button class="btn primary" data-new="INV">New tax invoice</button>
-          <button class="btn" data-new="QTN">New quotation</button>
-          <button class="btn" data-new="DC">New delivery challan</button>
-          <button class="btn" id="btnCompany">Company details ▾</button>
-          <button class="btn" id="btnCustomers">Customers ▾</button>
-        </div>
+        <h2 style="margin:0">${esc(md.title)}</h2>
+        <div class="row">${md.buttons.map(([t, l], i) => `<button class="btn ${i ? "" : "primary"}" data-new="${t}">${esc(l)}</button>`).join("")}</div>
       </div>
-      <p class="note" style="margin:8px 0 0">Tax invoices and delivery challans reduce stock as soon as they're saved. Quotations don't. Cancelling returns the stock. A challan converted to an invoice isn't counted twice.</p>
+      <p class="note" style="margin:8px 0 0">${esc(md.note)}</p>
     </div>
-    <div class="panel pad hidden" id="companyBox"></div>
-    <div class="panel pad hidden" id="customerBox"></div>
     <div class="panel pad hidden" id="editor"></div>
     <div class="panel hidden" id="docView"></div>
     <div class="panel">
       <div class="toolbar">
         <input type="search" id="sq" placeholder="Search number, customer, PID…" aria-label="Search documents">
-        <select id="sType" aria-label="Document type"><option value="">All documents</option><option value="INV">Tax invoices</option><option value="QTN">Quotations</option><option value="DC">Delivery challans</option></select>
+        ${md.types.length > 1 ? `<select id="sType" aria-label="Document type"><option value="">All</option>${md.types.map(t => `<option value="${t}">${esc(DOC_TYPES[t].name)}s</option>`).join("")}</select>` : ""}
         <select id="sStatus" aria-label="Status"><option value="">Any status</option><option value="active">Active / open</option><option value="converted">Converted / billed</option><option value="cancelled">Cancelled</option></select>
         <span class="count" id="scount"></span>
       </div>
       <div class="tablewrap"><table id="salestbl"><thead></thead><tbody></tbody></table></div>
     </div>`;
-    el.addEventListener("click", salesClick); el.addEventListener("input", salesInput); el.addEventListener("change", salesChange);
+    if (!el.dataset.bound) { el.dataset.bound = "1"; el.addEventListener("click", salesClick); el.addEventListener("input", salesInput); el.addEventListener("change", salesChange); }
   }
-  $("tab-sales").querySelectorAll("[data-new]").forEach(b => b.disabled = !S.canWrite || !S.db);
-  renderEditor(); renderSalesList(); if (!$("companyBox").classList.contains("hidden")) renderCompany(); if (!$("customerBox").classList.contains("hidden")) renderCustomers();
-  if (S.salesView) renderDocView(S.salesView);
+  el.querySelectorAll("[data-new]").forEach(b => b.disabled = !canType(b.dataset.new) || !S.db);
+  renderEditor(); renderSalesList();
+  if (S.salesView && S.sales[S.salesView] && md.types.includes(S.sales[S.salesView].type)) renderDocView(S.salesView); else $("docView").classList.add("hidden");
 }
 function statusPill(d) {
   const s = d.status;
   if (s === "cancelled") return '<span class="pill bad">Cancelled</span>';
-  if (d.type === "QTN") return s === "converted" ? '<span class="pill good">Converted</span>' : '<span class="pill warn">Open</span>';
-  if (d.type === "DC") return s === "billed" ? '<span class="pill good">Billed</span>' : '<span class="pill warn">Open (not billed)</span>';
+  if (isOrderType(d.type)) return s === "converted" ? '<span class="pill good">Converted</span>' : '<span class="pill warn">Open</span>';
+  if (d.type === "DC") { const L = d.lines || []; const pend = L.reduce((a, l) => a + dcPending(l), 0), billed = L.reduce((a, l) => a + (l.billedQty || 0), 0), ret = L.reduce((a, l) => a + (l.returnedQty || 0), 0);
+    if (pend <= 0) return billed ? '<span class="pill good">Billed</span>' : '<span class="pill good">Returned</span>';
+    return billed || ret ? `<span class="pill warn">${inr(pend, 0)} at hospital</span>` : '<span class="pill warn">Open (not billed)</span>'; }
+  if (typeof invoicePayPill === "function") return invoicePayPill(d);
   return '<span class="pill good">Active</span>';
 }
 function renderSalesList() {
-  const f = { q: ($("sq")?.value || "").toLowerCase(), t: $("sType")?.value || "", s: $("sStatus")?.value || "" };
-  let docs = Object.entries(S.sales).map(([id, d]) => ({ id, ...d })).sort((a, b) => (b.date + b.no).localeCompare(a.date + a.no));
+  const f = { q: ($("sq")?.value || "").toLowerCase(), t: $("sType")?.value || "", s: $("sStatus")?.value || "" }; const md = salesMode();
+  let docs = Object.entries(S.sales).map(([id, d]) => ({ id, ...d })).filter(d => md.types.includes(d.type)).sort((a, b) => (b.date + b.no).localeCompare(a.date + a.no));
   docs = docs.filter(d => (!f.t || d.type === f.t) && (!f.s || (f.s === "active" ? ["active", "open"].includes(d.status) : f.s === "converted" ? ["converted", "billed"].includes(d.status) : d.status === f.s))
     && (!f.q || [d.no, d.customer?.name, d.customer?.gstin, ...(d.lines || []).map(l => l.pid + " " + l.mat + " " + l.batch + " " + l.serial)].join(" ").toLowerCase().includes(f.q)));
   $("salestbl").tHead.innerHTML = "<tr><th>Number</th><th>Type</th><th>Date</th><th>Customer</th><th class='num'>Lines</th><th class='num'>QTY</th><th class='num'>Total (₹)</th><th>Status</th><th></th></tr>";
   $("salestbl").tBodies[0].innerHTML = docs.length ? docs.map(d => {
     const acts = [`<button class="btn" data-view="${esc(d.id)}">View / PDF</button>`];
-    if (S.canWrite && d.status !== "cancelled") {
-      if (d.type === "QTN" && d.status === "open") acts.push(`<button class="btn" data-editq="${esc(d.id)}">Edit</button>`, `<button class="btn" data-conv="INV:${esc(d.id)}">→ Invoice</button>`, `<button class="btn" data-conv="DC:${esc(d.id)}">→ Challan</button>`);
-      if (d.type === "DC" && d.status === "open") acts.push(`<button class="btn" data-conv="INV:${esc(d.id)}">→ Invoice</button>`);
-      if (!(d.type === "DC" && d.status === "billed") && !(d.type === "QTN" && d.status === "converted")) acts.push(`<button class="btn danger" data-cancel="${esc(d.id)}">Cancel</button>`);
+    if (d.status !== "cancelled") {
+      const mine = canType(d.type);
+      if (isOrderType(d.type) && d.status === "open") { if (mine) acts.push(`<button class="btn" data-editq="${esc(d.id)}">Edit</button>`); if (d.type === "QTN" && canType("SO")) acts.push(`<button class="btn" data-conv="SO:${esc(d.id)}">→ Order</button>`); if (canType("DC")) acts.push(`<button class="btn" data-conv="DC:${esc(d.id)}">→ Challan</button>`); if (canType("INV")) acts.push(`<button class="btn" data-conv="INV:${esc(d.id)}">→ Invoice</button>`); }
+      const pend = d.type === "DC" ? (d.lines || []).reduce((a, l) => a + dcPending(l), 0) : 0;
+      if (d.type === "DC" && pend > 0) { if (canType("INV")) acts.push(`<button class="btn" data-conv="INV:${esc(d.id)}">Bill used →</button>`); if (mine || (typeof canEditPanel === "function" && canEditPanel("supply"))) acts.push(`<button class="btn" data-ret="${esc(d.id)}">Return unused</button>`); }
+      const dcTouched = d.type === "DC" && (d.lines || []).some(l => (l.billedQty || 0) + (l.returnedQty || 0) > 0);
+      if (mine && !dcTouched && !(isOrderType(d.type) && d.status === "converted")) acts.push(`<button class="btn danger" data-cancel="${esc(d.id)}">Cancel</button>`);
     }
     return `<tr><td class="code">${esc(d.no)}</td><td>${esc(DOC_TYPES[d.type].short)}</td><td>${esc(dmy(d.date))}</td><td>${esc(d.customer?.name || "")}</td><td class="num">${(d.lines || []).length}</td><td class="num">${inr(d.totals?.qty || 0, 0)}</td><td class="num">${inr(d.type === "DC" ? d.totals?.taxable : d.totals?.grand)}</td><td>${statusPill(d)}${d.refNo ? `<div class="note">from ${esc(d.refNo)}</div>` : ""}${d.billedBy ? `<div class="note">billed in ${esc(d.billedBy)}</div>` : ""}${d.convertedTo ? `<div class="note">→ ${esc(d.convertedTo)}</div>` : ""}</td><td><div class="row" style="flex-wrap:nowrap">${acts.join("")}</div></td></tr>`;
-  }).join("") : `<tr><td colspan="9" class="empty">No documents yet. Start with <b>New tax invoice</b>, <b>New quotation</b> or <b>New delivery challan</b>.</td></tr>`;
+  }).join("") : `<tr><td colspan="9" class="empty">No documents yet.</td></tr>`;
   $("scount").textContent = `${docs.length} document${docs.length === 1 ? "" : "s"}`;
 }
 function renderEditor() {
@@ -170,7 +183,7 @@ function renderEditor() {
    <div class="grid2" style="margin-top:10px">
      <div style="display:grid;gap:8px;align-content:start">
        <div class="row"><label for="edDate"><b>Date</b></label><input type="date" id="edDate" value="${esc(E.date)}">${E.type === "QTN" ? `<label for="edValid"><b>Valid until</b></label><input type="date" id="edValid" value="${esc(E.validUntil)}">` : ""}</div>
-       <div class="row"><label for="edRef">Your ref. / enquiry no.</label><input type="text" id="edRef" value="${esc(E.yourRef)}" style="width:150px"><label for="edPrep">Prepared by</label><input type="text" id="edPrep" value="${esc(E.preparedBy)}" placeholder="Name, designation" style="width:170px"></div>
+       <div class="row">${E.type === "INV" ? `<label for="edCredit">Credit days</label><input type="number" min="0" step="1" id="edCredit" value="${esc(E.creditDays ?? 30)}" style="width:70px">` : ""}<label for="edRef">Your ref. / enquiry no.</label><input type="text" id="edRef" value="${esc(E.yourRef)}" style="width:150px"><label for="edPrep">Prepared by</label><input type="text" id="edPrep" value="${esc(E.preparedBy)}" placeholder="Name, designation" style="width:170px"></div>
        <div class="row"><label for="edCust"><b>Customer</b></label><select id="edCust"><option value="">— new customer —</option>${custOpts}</select></div>
        <div class="kvform">
          <label for="cName">Name</label><input type="text" id="cName" data-c="name" value="${esc(E.cust.name)}">
@@ -196,7 +209,7 @@ function renderEditor() {
      <div class="row"><label class="chk"><input type="checkbox" data-o="surgOn" ${O.surgOn ? "checked" : ""}> Surgeon discount</label><input type="number" min="0" max="100" step="0.01" data-o="surgPct" value="${O.surgPct}" placeholder="0" style="width:80px" ${O.surgOn ? "" : "disabled"} aria-label="Surgeon discount percent"> % <span class="note">applied after the hospital discount</span></div>
      <div class="row"><label class="chk"><input type="checkbox" data-o="gstOn" ${O.gstOn ? "checked" : ""}> GST</label><input type="number" min="0" max="28" step="0.01" data-o="gstPct" value="${O.gstPct}" placeholder="e.g. 5" style="width:80px" ${O.gstOn ? "" : "disabled"} aria-label="GST percent"> % <span class="note">${O.gstOn ? (intra ? `applied to every item as CGST ${inr((+O.gstPct || 0) / 2)}% + SGST ${inr((+O.gstPct || 0) / 2)}%` : `applied to every item as IGST ${inr(+O.gstPct || 0)}%`) : "tick and enter the GST % to add GST; unticked, no GST is added or printed"}</span></div>
    </div>
-   ${E.fromDc ? `<div class="msg warn" style="margin-top:10px">Billing a delivery challan: items and quantities come from the challan and its stock is already out, so this invoice won't reduce stock again. You can change rates, discount and GST.</div>` : `
+   ${E.fromDc ? `<div class="msg warn" style="margin-top:10px">Billing a delivery challan: only items still at the hospital are listed, with their quantity. Lower the quantity or remove items that weren't used (return those to stock later with Return unused). Stock is already out on the challan, so this invoice won't reduce it again.</div>` : `
    <div style="margin-top:12px;display:grid;gap:6px">
      <label for="pick"><b>Add product</b> <span class="note">search PID, code, description, batch or serial. In-stock items only, earliest expiry first.</span></label>
      <input type="search" id="pick" placeholder="e.g. MHC12, MT-PS73, LUSC-35, K2512…" autocomplete="off">
@@ -205,15 +218,15 @@ function renderEditor() {
    <div class="tablewrap" style="margin-top:10px;max-height:none"><table class="edtable">
      <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th><th class="num">Rate</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
      <tbody>${E.lines.length ? E.lines.map((l, i) => { const c = calcLine(l, intra, O); const av = availFor(l.key); const over = T.deducts && !E.fromDc && l.qty > av;
-       return `<tr><td>${i + 1}</td><td class="dhh">${esc(l.pid)}</td><td class="desc">${esc(l.desc)}<div class="note">${esc(l.mat)} · HSN ${esc(l.hsn)}</div></td><td class="code">${esc(l.batch)}${l.serial ? "<br>" + esc(l.serial) : ""}</td><td>${esc(l.exp)}</td><td class="num">${E.fromDc ? "—" : inr(av, 0)}</td>
-       <td class="num"><input type="number" min="1" step="1" data-l="qty" data-i="${i}" value="${l.qty}" style="width:64px;text-align:right;${over ? "border-color:var(--bad)" : ""}" ${E.fromDc || l.serial ? "readonly" : ""} aria-label="Quantity line ${i + 1}"></td>
+       return `<tr><td>${i + 1}</td><td class="dhh">${esc(l.pid)}</td><td class="desc">${esc(l.desc)}<div class="note">${esc(l.mat)} · HSN ${esc(l.hsn)}</div></td><td class="code">${esc(l.batch)}${l.serial ? "<br>" + esc(l.serial) : ""}</td><td>${esc(l.exp)}</td><td class="num">${E.fromDc ? inr(l.dcPending, 0) : inr(av, 0)}</td>
+       <td class="num"><input type="number" min="1" step="1" data-l="qty" data-i="${i}" value="${l.qty}" style="width:64px;text-align:right;${over ? "border-color:var(--bad)" : ""}" ${l.serial ? "readonly" : ""} aria-label="Quantity line ${i + 1}"></td>
        <td class="num">${inr(l.mrp)}</td>
        <td class="num"><input type="number" min="0" step="0.01" data-l="rate" data-i="${i}" value="${l.rate}" style="width:96px;text-align:right" aria-label="Rate line ${i + 1}"></td>
        <td class="num"><input type="number" min="0" max="100" step="0.01" data-l="discPct" data-i="${i}" value="${l.discPct}" style="width:64px;text-align:right" aria-label="Discount line ${i + 1}"></td>
        <td class="num">${inr(c.gstRate)}</td>
        <td class="num">${inr(c.amount)}</td><td class="num">${inr(c.total)}</td>
        <td><input type="text" data-l="remarks" data-i="${i}" value="${esc(l.remarks)}" style="width:130px" aria-label="Remarks line ${i + 1}"></td>
-       <td>${E.fromDc ? "" : `<button class="btn" data-ldel="${i}" aria-label="Remove line">✕</button>`}</td></tr>`; }).join("") : `<tr><td colspan="15" class="empty">No products yet. Search above to add.</td></tr>`}</tbody>
+       <td><button class="btn" data-ldel="${i}" aria-label="Remove line">✕</button></td></tr>`; }).join("") : `<tr><td colspan="15" class="empty">No products yet. Search above to add.</td></tr>`}</tbody>
    </table></div>
    <div class="row" style="justify-content:space-between;margin-top:10px;align-items:flex-start">
      <div id="edMsg" class="hidden"></div>
@@ -250,6 +263,7 @@ function salesInput(e) {
   if (t.dataset.xv) { E.extra[+t.dataset.xv].value = t.value; return; }
   if (t.id === "edNotes") { E.notes = t.value; return; }
   if (t.id === "edRef") { E.yourRef = t.value; return; }
+  if (t.id === "edCredit") { E.creditDays = t.value === "" ? "" : Math.max(0, Math.round(+t.value || 0)); return; }
   if (t.id === "edPrep") { E.preparedBy = t.value; return; }
   if (t.dataset.o && t.type === "number") { E.opts[t.dataset.o] = t.value === "" ? "" : (parseFloat(t.value) || 0); return; }
   if (t.dataset.l) { const l = E.lines[+t.dataset.i]; const k = t.dataset.l; l[k] = k === "remarks" ? t.value : (parseFloat(t.value) || 0); if (k === "qty") l.qty = Math.max(0, Math.round(l.qty)); }
@@ -261,7 +275,7 @@ function salesChange(e) {
   if (t.id === "edDate") { E.date = t.value || todayIso(); return renderEditor(); }
   if (t.id === "edValid") { E.validUntil = t.value; return; }
   if (t.dataset.o) { if (t.type === "checkbox") E.opts[t.dataset.o] = t.checked; else E.opts[t.dataset.o] = t.value === "" ? "" : Math.min(100, Math.max(0, parseFloat(t.value) || 0)); if (t.type === "checkbox" && t.checked) setTimeout(() => document.querySelector(`[data-o="${t.dataset.o.replace("On", "Pct")}"]`)?.focus(), 0); return renderEditor(); }
-  if (t.id === "edCust") { E.customerId = t.value; E.cust = t.value ? { ...S.customers[t.value] } : { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }; return renderEditor(); }
+  if (t.id === "edCust") { E.customerId = t.value; E.cust = t.value ? { ...S.customers[t.value] } : { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }; if (E.type === "INV") E.creditDays = t.value && S.customers[t.value].creditDays != null ? S.customers[t.value].creditDays : 30; return renderEditor(); }
   if (t.dataset.c === "stateCode" || t.dataset.c === "gstin") { E.cust[t.dataset.c] = t.value; if (t.dataset.c === "gstin" && STATES[t.value.slice(0, 2)]) E.cust.stateCode = t.value.slice(0, 2); return renderEditor(); }
   if (t.dataset.l && t.dataset.l !== "remarks") return renderEditor();
 }
@@ -309,7 +323,9 @@ async function saveDoc(btn) {
     const m = soldMap(E.editingId); const bad = E.lines.filter(l => { const r = stockFor(l.key); return !r || l.qty > r2(r.qty - (m[l.key] || 0)); });
     if (bad.length) return edMsg(`Not enough stock for ${bad.map(l => l.pid || l.mat).join(", ")}. Lower the quantity or remove the line.`, "bad");
   }
-  if (E.fromDc && S.sales[E.refDc]?.status !== "open") return edMsg("That challan is no longer open (already billed or cancelled).", "bad");
+  if (E.fromDc) { const dc = S.sales[E.refDc]; if (!dc || dc.status === "cancelled") return edMsg("That challan was cancelled.", "bad");
+    const over = E.lines.filter(l => l.qty > dcPending(dc.lines[l.dcIdx] || {})); if (over.length) return edMsg(`More than is still at the hospital for ${over.map(l => l.pid || l.mat).join(", ")}.`, "bad"); }
+  if (!canType(E.type)) return edMsg("You don't have permission to create this document. Ask an admin.", "bad");
   btn.disabled = true; btn.textContent = "Saving…";
   try {
     const intra = isIntra(E.cust); const opts = { ...E.opts }; const totals = calcDoc(E.lines, intra, E.type, opts);
@@ -317,7 +333,8 @@ async function saveDoc(btn) {
     let customerId = E.customerId;
     if (!customerId) { customerId = "c" + Date.now().toString(36); await S.db.doc(`customers/${customerId}`).set({ name: cust.name, address: cust.address, gstin: cust.gstin, stateCode: cust.stateCode, stateName: cust.stateName, dl: cust.dl, phone: cust.phone }); }
     const lines = E.lines.map(l => { const c = calcLine(l, intra, opts); return { ...l, ...c }; });
-    const base = { opts, validUntil: E.validUntil || "", yourRef: E.yourRef || "", preparedBy: E.preparedBy || "", type: E.type, date: E.date, customerId, customer: cust, intra, extra: E.extra.filter(x => x.label.trim() || x.value.trim()), notes: E.notes, lines, totals, company: { ...S.company } };
+    const dueDate = E.type === "INV" ? (() => { const d = new Date(E.date); d.setDate(d.getDate() + (+E.creditDays || 0)); return d.toISOString().slice(0, 10); })() : "";
+    const base = { dueDate, creditDays: E.type === "INV" ? (+E.creditDays || 0) : null, opts, validUntil: E.validUntil || "", yourRef: E.yourRef || "", preparedBy: E.preparedBy || "", type: E.type, date: E.date, customerId, customer: cust, intra, extra: E.extra.filter(x => x.label.trim() || x.value.trim()), notes: E.notes, lines, totals, company: { ...S.company } };
     let id, no;
     if (E.editingId) { id = E.editingId; const old = S.sales[id]; no = old.no; await S.db.doc(`sales/${id}`).set({ ...old, ...base, no, updatedAt: new Date().toISOString() }); }
     else {
@@ -325,7 +342,9 @@ async function saveDoc(btn) {
       const ref = E.refQtn || E.refDc;
       await S.db.doc(`sales/${id}`).set({ ...base, no, fy, seq, status: E.type === "INV" ? "active" : "open", fromDc: !!E.fromDc, refId: ref || "", refNo: ref ? S.sales[ref].no : "", createdAt: new Date().toISOString() });
       if (E.refQtn) await S.db.doc(`sales/${E.refQtn}`).set({ ...S.sales[E.refQtn], status: "converted", convertedTo: no });
-      if (E.refDc) await S.db.doc(`sales/${E.refDc}`).set({ ...S.sales[E.refDc], status: "billed", billedBy: no, billedId: id });
+      if (E.refDc) { const dc = JSON.parse(JSON.stringify(S.sales[E.refDc])); for (const l of E.lines) { const dl = dc.lines[l.dcIdx]; if (dl) dl.billedQty = r2((dl.billedQty || 0) + l.qty); }
+        const pend = dc.lines.reduce((a, l) => a + dcPending(l), 0); dc.status = pend > 0 ? "open" : "billed"; dc.billedBy = [dc.billedBy, no].filter(Boolean).join(", "); dc.billedIds = [...(dc.billedIds || []), id];
+        await S.db.doc(`sales/${E.refDc}`).set(dc); }
     }
     S.ed = null; S._pickq = ""; S.salesView = id; renderSales();
     msg($("globalmsg"), "good", `Saved ${T.name.toLowerCase()} ${no}.` + (T.deducts && !E.fromDc ? " Stock updated." : ""));
@@ -334,17 +353,50 @@ async function saveDoc(btn) {
 async function cancelDoc(b) {
   const id = b.dataset.cancel; const d = S.sales[id];
   if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Click again to cancel " + d.no; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Cancel"; } }, 4000); return; }
+  if (d.type === "INV" && typeof invoiceReceived === "function" && invoiceReceived(id) > 0) { msg($("globalmsg"), "bad", `${d.no} has payments recorded against it. Cancel those receipts in Payment Received first.`); return; }
   b.disabled = true;
   try {
     await S.db.doc(`sales/${id}`).set({ ...d, status: "cancelled", cancelledAt: new Date().toISOString() });
-    if (d.type === "INV" && d.fromDc && d.refId && S.sales[d.refId]) { const dc = { ...S.sales[d.refId], status: "open" }; delete dc.billedBy; delete dc.billedId; await S.db.doc(`sales/${d.refId}`).set(dc); }
-    if (d.refId && S.sales[d.refId]?.type === "QTN" && S.sales[d.refId].convertedTo === d.no) { const q = { ...S.sales[d.refId], status: "open" }; delete q.convertedTo; await S.db.doc(`sales/${d.refId}`).set(q); }
-    msg($("globalmsg"), "good", `Cancelled ${d.no}.` + (lineDeducts(d) ? " Its quantity is back in stock." : d.fromDc ? " The challan is open again." : ""));
+    if (d.type === "INV" && d.fromDc && d.refId && S.sales[d.refId]) { const dc = JSON.parse(JSON.stringify(S.sales[d.refId]));
+      for (const l of d.lines) { const dl = l.dcIdx != null ? dc.lines[l.dcIdx] : dc.lines.find(x => x.key === l.key); if (dl) dl.billedQty = Math.max(0, r2((dl.billedQty || 0) - l.qty)); }
+      dc.status = "open"; dc.billedIds = (dc.billedIds || []).filter(x => x !== id); dc.billedBy = (dc.billedBy || "").split(", ").filter(x => x && x !== d.no).join(", "); await S.db.doc(`sales/${d.refId}`).set(dc); }
+    if (d.refId && isOrderType(S.sales[d.refId]?.type) && S.sales[d.refId].convertedTo === d.no) { const q = { ...S.sales[d.refId], status: "open" }; delete q.convertedTo; await S.db.doc(`sales/${d.refId}`).set(q); }
+    msg($("globalmsg"), "good", `Cancelled ${d.no}.` + (lineDeducts(d) ? " Its quantity is back in stock." : d.fromDc ? " Those items show as at the hospital again on the challan." : ""));
   } catch (err) { b.disabled = false; msg($("globalmsg"), "bad", "Couldn't cancel: " + (err.message || err.code)); }
 }
 
+/* ---------- challan returns ---------- */
+async function returnDc(id, qtys, note) {
+  const dc = JSON.parse(JSON.stringify(S.sales[id])); const now = new Date().toISOString(); const items = [];
+  for (const [i, q] of Object.entries(qtys)) { const l = dc.lines[i]; if (!l || !(q > 0)) continue; if (q > dcPending(l)) throw new Error(`Line ${+i + 1}: more than is at the hospital`); l.returnedQty = r2((l.returnedQty || 0) + q); items.push({ idx: +i, pid: l.pid, qty: q }); }
+  if (!items.length) throw new Error("Enter a quantity to return");
+  dc.returns = [...(dc.returns || []), { at: now, note: note || "", items }];
+  const pend = dc.lines.reduce((a, l) => a + dcPending(l), 0); if (pend <= 0) dc.status = dc.lines.some(l => l.billedQty) ? "billed" : "returned";
+  await S.db.doc(`sales/${id}`).set(dc); return items.reduce((a, x) => a + x.qty, 0);
+}
+function renderReturnForm(id, box) {
+  const d = S.sales[id]; const L = d.lines.map((l, i) => ({ l, i, p: dcPending(l) })).filter(x => x.p > 0);
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="toolbar"><b>Return unused items: ${esc(d.no)}</b><span class="count">${esc(d.customer?.name || "")}</span></div>
+   <div class="pad" style="display:grid;gap:10px"><p class="note" style="margin:0">Enter how many of each item came back unused. They go back into stock straight away.</p>
+   <div class="tablewrap" style="max-height:none"><table><thead><tr><th>PID</th><th>Description</th><th>Batch / Serial</th><th class="num">At hospital</th><th class="num">Returned now</th></tr></thead><tbody>
+   ${L.map(x => `<tr><td class="dhh">${esc(x.l.pid)}</td><td class="desc">${esc(x.l.desc)}</td><td class="code">${esc(x.l.batch)}${x.l.serial ? "<br>" + esc(x.l.serial) : ""}</td><td class="num">${inr(x.p, 0)}</td><td class="num"><input type="number" min="0" max="${x.p}" step="1" data-retq="${x.i}" value="0" style="width:70px;text-align:right" aria-label="Return quantity"></td></tr>`).join("")}</tbody></table></div>
+   <div class="row"><input type="text" data-retnote placeholder="Note (optional)" style="flex:1"><button class="btn" data-retall="${esc(id)}">All unused</button><button class="btn primary" data-retsave="${esc(id)}">Return to stock</button><button class="btn" data-retclose>Close</button><span class="note" data-retmsg></span></div></div>`;
+  box.scrollIntoView({ block: "start" });
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-ret],[data-retall],[data-retsave],[data-retclose]"); if (!b) return;
+  if (b.dataset.ret) { const box = b.closest("section").querySelector("#docView,.retbox") || $("docView"); S.salesView = null; return renderReturnForm(b.dataset.ret, box); }
+  const box = b.closest(".panel");
+  if (b.hasAttribute("data-retclose")) { box.classList.add("hidden"); return; }
+  if (b.dataset.retall) { box.querySelectorAll("[data-retq]").forEach(i => i.value = i.max); return; }
+  if (b.dataset.retsave) { const q = {}; box.querySelectorAll("[data-retq]").forEach(i => q[i.dataset.retq] = Math.max(0, Math.round(+i.value || 0)));
+    b.disabled = true; try { const n = await returnDc(b.dataset.retsave, q, box.querySelector("[data-retnote]").value); box.classList.add("hidden"); msg($("globalmsg"), "good", `${n} item${n === 1 ? "" : "s"} returned to stock from ${S.sales[b.dataset.retsave].no}.`); }
+    catch (err) { b.disabled = false; box.querySelector("[data-retmsg]").textContent = err.message || err.code; } }
+});
+
 /* ---------- company & customers ---------- */
-const COMPANY_FIELDS = [["name", "Company name"], ["tagline", "Tagline (under the title)"], ["address", "Address", 1], ["gstin", "GSTIN"], ["cin", "CIN"], ["stateCode", "State code"], ["dl", "Drug licence no."], ["phone", "Phone"], ["email", "Email"], ["bankName", "Bank name"], ["bankAccount", "Account no."], ["bankIfsc", "IFSC"], ["bankBranch", "Branch"], ["termsQuote", "Terms: quotation", 1], ["termsInvoice", "Terms: tax invoice", 1], ["termsDc", "Terms: delivery challan", 1], ["closing", "Closing line", 1], ["signatory", "Signatory line"]];
+const COMPANY_FIELDS = [["name", "Company name"], ["tagline", "Tagline (under the title)"], ["address", "Address", 1], ["gstin", "GSTIN"], ["cin", "CIN"], ["stateCode", "State code"], ["dl", "Drug licence no."], ["phone", "Phone"], ["email", "Email"], ["bankName", "Bank name"], ["bankAccount", "Account no."], ["bankIfsc", "IFSC"], ["bankBranch", "Branch"], ["termsQuote", "Terms: quotation", 1], ["termsInvoice", "Terms: tax invoice", 1], ["termsDc", "Terms: delivery challan", 1], ["termsPo", "Terms: purchase order", 1], ["closing", "Closing line", 1], ["signatory", "Signatory line"]];
 function renderCompany() {
   const c = S.company; const f = COMPANY_FIELDS;
   $("companyBox").innerHTML = `<h2>Company details (printed on every document)</h2>
@@ -405,14 +457,16 @@ function buildPdf(d) {
   if (d.status === "cancelled") { doc.setFont("FreeSans", "bold"); doc.setFontSize(11); setC(RED); doc.text("CANCELLED", W - M, 29, { align: "right" }); }
   y = Math.max(y, 31) + 2; doc.setDrawColor(...DARK); doc.setLineWidth(0.5); doc.line(M, y, W - M, y); y += 5;
   // to / details boxes
-  const half = (W - 2 * M) / 2; const toLbl = d.type === "DC" ? "DELIVER TO" : d.type === "QTN" ? "QUOTATION TO" : "BILL TO";
+  const half = (W - 2 * M) / 2; const toLbl = d.type === "DC" ? "DELIVER TO" : d.type === "QTN" ? "QUOTATION TO" : d.type === "SO" ? "ORDER FROM" : d.type === "PO" ? "SUPPLIER" : "BILL TO";
   const left = [[d.customer.name || "", true], ...(d.customer.address || "").split("\n").filter(Boolean).map(a => [a, false])];
   if (d.customer.gstin) left.push(["GSTIN: " + d.customer.gstin, false]); if (d.customer.dl) left.push(["DL No.: " + d.customer.dl, false]);
   if (d.customer.phone) left.push(["Phone: " + d.customer.phone, false]); left.push([`State: ${d.customer.stateCode} ${d.customer.stateName || ""}`, false]);
   const right = [[`${T.short} No.:`, d.no], ["Date:", dmy(d.date)]];
   if (d.type === "QTN" && d.validUntil) { const days = Math.round((new Date(d.validUntil) - new Date(d.date)) / 864e5); right.push(["Valid Until:", `${dmy(d.validUntil)}${days > 0 ? ` (${days} days)` : ""}`]); }
   if (d.refNo) right.push(["Our Ref.:", d.refNo]); if (d.yourRef) right.push(["Your Ref. / Enquiry No.:", d.yourRef]);
-  if (d.type !== "QTN") right.push(["Place of Supply:", `${d.customer.stateCode} ${d.customer.stateName || ""}`]);
+  if (d.type === "INV" && d.dueDate) right.push(["Due Date:", dmy(d.dueDate)]);
+  if (d.type === "PO" && d.expectedDate) right.push(["Expected Delivery:", dmy(d.expectedDate)]);
+  if (d.type !== "QTN" && d.type !== "PO") right.push(["Place of Supply:", `${d.customer.stateCode} ${d.customer.stateName || ""}`]);
   for (const x of d.extra || []) right.push([x.label + ":", x.value]); if (d.preparedBy) right.push(["Prepared By:", d.preparedBy]);
   doc.autoTable({ startY: y, margin: { left: M, right: M }, theme: "grid", tableWidth: W - 2 * M,
     head: [[toLbl, `${T.title} DETAILS`]], body: [["", ""]], headStyles: { font: "FreeSans", fillColor: DARK, textColor: 255, fontSize: 8, cellPadding: 1.8 },
@@ -426,9 +480,9 @@ function buildPdf(d) {
   const heading = (txt, yy) => { doc.setFillColor(...RED); doc.rect(M, yy - 3.6, 1.2, 4.6, "F"); doc.setFont("FreeSans", "bold"); doc.setFontSize(10); setC(INK); doc.text(txt, M + 3, yy); };
   heading("ITEM DETAILS", y); y += 3;
   const docDisc = O.hospOn || O.surgOn; const hasGst = r2((t.cgst || 0) + (t.sgst || 0) + (t.igst || 0)) > 0;
-  const showRate = d.lines.some(l => r2(l.rate) !== r2(l.mrp)); const showLineDisc = d.lines.some(l => l.discPct);
+  const showRate = d.type !== "PO" && d.lines.some(l => r2(l.rate) !== r2(l.mrp)); const showLineDisc = d.lines.some(l => l.discPct);
   const rates = [...new Set(d.lines.map(l => l.gstRate))]; const gstLbl = rates.length === 1 ? ` ${n2(rates[0]).replace(/\.00$/, "")}%` : "";
-  const cols = [["S.No", 11, "c"], ["DHH PID", 19, "c"], ["Product Name", 0, "l"], ["MRP (₹)", 22, "r"]];
+  const isPO = d.type === "PO"; const cols = [["S.No", 11, "c"], [isPO ? "Material Code" : "DHH PID", isPO ? 26 : 19, "c"], ["Product Name", 0, "l"], [isPO ? "Rate (₹)" : "MRP (₹)", 22, "r"]];
   if (showRate) cols.push(["Rate (₹)", 21, "r"]);
   cols.push(["Quantity", 17, "c"]); if (showLineDisc) cols.push(["Disc %", 13, "r"]);
   cols.push(["Total Quantity Amount", 25, "r"]);
@@ -436,7 +490,7 @@ function buildPdf(d) {
   const fixed = cols.reduce((a, c) => a + c[1], 0); cols[2][1] = W - 2 * M - fixed;
   const body = d.lines.map((l, i) => {
     const sub = [l.batch ? "Batch " + l.batch : "", l.serial ? "S/N " + l.serial : "", l.exp ? "Exp " + l.exp : "", l.hsn ? "HSN " + l.hsn : ""].filter(Boolean).join(" · ") + (l.remarks ? "\n" + l.remarks : "");
-    const row = [i + 1, { content: l.pid || "—", styles: { fontStyle: "bold", textColor: DARK } }, { content: l.desc + (sub ? "\n" + sub : ""), _main: l.desc }, n2(l.mrp)];
+    const row = [i + 1, { content: (isPO ? l.mat : l.pid) || "—", styles: { fontStyle: "bold", textColor: DARK, fontSize: isPO ? 7 : 8.2 } }, { content: l.desc + (sub ? "\n" + sub : ""), _main: l.desc }, n2(isPO ? l.rate : l.mrp)];
     if (showRate) row.push(n2(l.rate)); row.push(l.qty); if (showLineDisc) row.push(n2(l.discPct));
     row.push(n2(l.amount ?? l.taxable));
     if (hasGst) row.push({ content: n2(l.total), styles: { fontStyle: "bold" } });
@@ -451,15 +505,15 @@ function buildPdf(d) {
       ls.forEach((ln, k) => { const isMain = k < mainLeft; doc.setFont("FreeSans", isMain ? "bold" : "normal"); doc.setFontSize(isMain ? 8.2 : 7); setC(isMain ? INK : GREY); doc.text(ln, c.cell.x + 2, yy); yy += isMain ? 3.5 : 3.1; }); } } });
   y = doc.lastAutoTable.finalY + 2;
   doc.setFont("FreeSans", "italic"); doc.setFontSize(7.2); setC(GREY);
-  doc.text(`Total Quantity Amount = ${showRate ? "Rate" : "MRP"} × Quantity${showLineDisc ? " − discount" : ""}.${hasGst ? ` Total Amount includes GST${rates.length === 1 ? " @" + gstLbl : ""}${docDisc ? " after the discounts below" : ""}.` : ""}`, M, y + 2); y += 7;
+  doc.text(`Total Quantity Amount = ${showRate || isPO ? "Rate" : "MRP"} × Quantity${showLineDisc ? " − discount" : ""}.${hasGst ? ` Total Amount includes GST${rates.length === 1 ? " @" + gstLbl : ""}${docDisc ? " after the discounts below" : ""}.` : ""}`, M, y + 2); y += 7;
   // totals box
   if (y > 225) { doc.addPage(); y = 18; }
-  const rows = [[`Gross Value (${showRate ? "Rate" : "MRP"} × Qty)`, "₹ " + n2(t.amount ?? t.taxable)]];
+  const rows = [[`Gross Value (${showRate || isPO ? "Rate" : "MRP"} × Qty)`, "₹ " + n2(t.amount ?? t.taxable)]];
   if (O.hospOn) rows.push([`Less: Hospital Discount @ ${n2(O.hospPct).replace(/\.00$/, "")}%`, "− ₹ " + n2(t.hospDisc)]);
   if (O.surgOn) rows.push([`Less: Surgeon Discount @ ${n2(O.surgPct).replace(/\.00$/, "")}%`, "− ₹ " + n2(t.surgDisc)]);
   if (docDisc) rows.push(["Taxable Value", "₹ " + n2(t.taxable)]);
   const halfR = rates.length === 1 ? ` @ ${n2(rates[0] / 2).replace(/\.00$/, "")}%` : "";
-  if (!hasGst) { } else if (d.type === "QTN") rows.push([`Add: GST${rates.length === 1 ? " @" + gstLbl : ""}`, "₹ " + n2(r2(t.cgst + t.sgst + t.igst))]);
+  if (!hasGst) { } else if (d.type === "QTN" || d.type === "SO" || d.type === "PO") rows.push([`Add: GST${rates.length === 1 ? " @" + gstLbl : ""}`, "₹ " + n2(r2(t.cgst + t.sgst + t.igst))]);
   else if (d.intra) rows.push([`Add: CGST${halfR}`, "₹ " + n2(t.cgst)], [`Add: SGST${halfR}`, "₹ " + n2(t.sgst)]);
   else rows.push([`Add: IGST${rates.length === 1 ? " @" + gstLbl : ""}`, "₹ " + n2(t.igst)]);
   if (t.roundOff) rows.push(["Round Off", "₹ " + n2(t.roundOff)]);
@@ -476,7 +530,7 @@ function buildPdf(d) {
   if (d.type === "INV" && (co.bankName || co.bankAccount)) { if (y > 250) { doc.addPage(); y = 18; } heading("BANK DETAILS", y + 1); y += 6; doc.setFont("FreeSans", "normal"); doc.setFontSize(8.5); setC(INK);
     doc.text([co.bankName, co.bankAccount ? "A/c No. " + co.bankAccount : "", co.bankIfsc ? "IFSC " + co.bankIfsc : "", co.bankBranch].filter(Boolean).join("   |   "), M, y); y += 7; }
   // terms
-  const terms = (d.type === "QTN" ? co.termsQuote : d.type === "DC" ? co.termsDc : co.termsInvoice) || co.terms || "";
+  const terms = (isOrderType(d.type) ? co.termsQuote : d.type === "DC" ? co.termsDc : d.type === "PO" ? co.termsPo : co.termsInvoice) || co.terms || "";
   const tl = terms.split("\n").map(x => x.trim()).filter(Boolean);
   if (tl.length) { if (y > 245) { doc.addPage(); y = 18; } heading("TERMS & CONDITIONS", y + 1); y += 7; doc.setFontSize(8.5);
     for (const ln of tl) { if (y > 270) { doc.addPage(); y = 18; } doc.setFillColor(...RED); doc.circle(M + 1.5, y - 1.1, 0.6, "F"); const m = ln.match(/^([^:]{1,40}):\s*(.*)$/); let xx = M + 4;
@@ -486,14 +540,14 @@ function buildPdf(d) {
   // signatures
   if (y > 262) { doc.addPage(); y = 20; } y += 4;
   doc.setFont("FreeSans", "bold"); doc.setFontSize(8.5); setC(INK);
-  doc.text(d.type === "QTN" ? "Customer Acceptance" : "Received By", M + 2, y); doc.text(`For ${co.name}`, W - M - 2, y, { align: "right" });
+  doc.text(isOrderType(d.type) ? "Customer Acceptance" : d.type === "PO" ? "Supplier Acceptance" : "Received By", M + 2, y); doc.text(`For ${co.name}`, W - M - 2, y, { align: "right" });
   y += 14; doc.setDrawColor(...GREY); doc.setLineWidth(0.3); doc.line(M, y, M + 85, y); doc.line(W - M - 85, y, W - M, y);
   doc.setFont("FreeSans", "normal"); doc.setFontSize(7.5); setC(GREY); doc.text("Signature, Name, Seal & Date", M, y + 4); doc.text(co.signatory || "Authorised Signatory", W - M, y + 4, { align: "right" });
   // footer
   const pages = doc.getNumberOfPages();
   for (let pg = 1; pg <= pages; pg++) { doc.setPage(pg); doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2); doc.line(M, 284, W - M, 284); doc.setFontSize(6.8); setC(GREY); doc.setFont("FreeSans", "normal");
     doc.text([co.name, co.gstin ? "GSTIN: " + co.gstin : "", co.phone ? "Ph: " + co.phone : "", co.email].filter(Boolean).join("  |  "), M, 288);
-    if (d.type !== "INV") doc.text(d.type === "QTN" ? "This is a quotation, not a tax invoice." : "Delivery challan, not a tax invoice.", M, 291.5);
+    if (d.type !== "INV") doc.text({ QTN: "This is a quotation, not a tax invoice.", SO: "Sales order, not a tax invoice.", DC: "Delivery challan, not a tax invoice.", PO: "Purchase order." }[d.type] || "", M, 291.5);
     doc.text(`Page ${pg} of ${pages}`, W - M, 288, { align: "right" }); }
   return doc;
 }

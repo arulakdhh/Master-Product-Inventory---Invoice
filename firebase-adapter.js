@@ -70,7 +70,7 @@
     if (u) { hideGate(); showUserBar(u); signedIn(u); }
     else showGate("Sign in to open the register.", true);
   });
-  const user = { id: async () => (await ready).uid, can: async () => true, canEdit: async () => true, isOwner: async () => true };
+  const user = { id: async () => (await ready).uid, email: async () => ((await ready).email || "").toLowerCase(), name: async () => (await ready).displayName || "", can: async () => true, canEdit: async () => true, isOwner: async () => true };
 
   window.claude = { use: async name => {
     if (name === "downloads") return downloads;

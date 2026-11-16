@@ -1,18 +1,61 @@
 rules_version = '2';
-// Only the Google accounts listed below can read or write the register.
-// Firebase console → Firestore Database → Rules → paste this → Publish.
+// Implant Product Register — access rules.
+// 1. Put your own Gmail below as the owner (owners are always admin).
+// 2. Firebase console → Firestore Database → Rules → paste this → Publish.
+// Everyone else is added and given panel access in the app: Admin panel → Users & access.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function allowed() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email in [
-             'YOUR_EMAIL@gmail.com'
-             // , 'colleague@example.com'   ← add more people here
-           ];
+    function owners() { return ['YOUR_EMAIL@gmail.com']; }
+
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function isOwner() { return signedIn() && myEmail() in owners(); }
+    function hasUser() { return signedIn() && exists(/databases/$(database)/documents/users/$(myEmail())); }
+    function me() { return get(/databases/$(database)/documents/users/$(myEmail())).data; }
+    function active() { return isOwner() || (hasUser() && me().get('active', true) == true); }
+    function isAdmin() { return isOwner() || (active() && hasUser() && me().get('isAdmin', false) == true); }
+    function perm(p) { return me().get('perms', {}).get(p, 'none'); }
+    function canEdit(p) { return isAdmin() || (active() && hasUser() && perm(p) == 'edit'); }
+    function canView(p) { return isAdmin() || (active() && hasUser() && (perm(p) == 'edit' || perm(p) == 'view')); }
+    function salesPanelEdit(t) {
+      return (t == 'INV' && canEdit('invoice'))
+          || (t == 'DC' && (canEdit('dispatch') || canEdit('invoice') || canEdit('supply')))
+          || ((t == 'QTN' || t == 'SO') && (canEdit('sellorder') || canEdit('dispatch') || canEdit('invoice')));
     }
-    match /{document=**} {
-      allow read, write: if allowed();
+
+    // Users & access: owners/admins manage; everyone can read their own record.
+    // An owner may create their own admin record the first time they sign in.
+    match /users/{email} {
+      allow read: if isAdmin() || (signedIn() && email == myEmail());
+      allow create: if isAdmin() || (isOwner() && email == myEmail());
+      allow update, delete: if isAdmin();
+    }
+
+    // Stock data: every active user can read (panels need it for stock), Invoice editors write.
+    match /invoices/{id} { allow read: if active(); allow write: if canEdit('invoice') || canEdit('inventory'); }
+    match /chunks/{id}   { allow read: if active(); allow write: if canEdit('invoice') || canEdit('inventory'); }
+    match /registry/{id} { allow read: if active(); allow write: if canEdit('invoice') || canEdit('inventory'); }
+
+    // Sales documents: write rights depend on the document type.
+    match /sales/{id} {
+      allow read: if active();
+      allow create, update: if salesPanelEdit(request.resource.data.type);
+      allow delete: if isAdmin();
+    }
+
+    match /purchaseOrders/{id} { allow read: if canView('po') || canView('invoice'); allow write: if canEdit('po'); }
+    match /receipts/{id}       { allow read: if canView('payrecv') || canView('payfollow') || canView('company') || canView('invoice'); allow write: if canEdit('payrecv'); }
+    match /followups/{id}      { allow read: if canView('payfollow') || canView('payrecv'); allow write: if canEdit('payfollow'); }
+    match /customers/{id}      { allow read: if active(); allow write: if canEdit('company') || canEdit('sellorder') || canEdit('invoice') || canEdit('dispatch'); }
+    match /presets/{id}        { allow read, write: if active(); }
+    match /locks/{id}          { allow read, write: if active(); }
+
+    match /settings/{doc} {
+      allow read: if active();
+      allow write: if isAdmin()
+        || (doc == 'company' && canEdit('company'))
+        || ((doc == 'counters' || doc == 'divisions') && canEdit('invoice'))
+        || (doc == 'salescounters' && (canEdit('invoice') || canEdit('dispatch') || canEdit('sellorder') || canEdit('po') || canEdit('payrecv') || canEdit('supply')));
     }
   }
 }
