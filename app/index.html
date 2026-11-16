@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implant Product Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: app bar + tab strip, then one working surface per tab (toolbar → table). Ledger-like, dense, scannable. */
+:root{
+  --bg:#f4f6f7; --surface:#ffffff; --ink:#17232b; --muted:#5d6b74; --line:#dde3e7;
+  --accent:#0b6e75; --accent-soft:#e1f1f2; --match:#b45309; --match-soft:#fdf1e3;
+  --good:#1d7a3e; --good-soft:#e5f4ea; --warn:#a15c00; --warn-soft:#fff3dc; --bad:#b42318; --bad-soft:#fdeceb;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1619; --surface:#162126; --ink:#e3eaed; --muted:#93a3ab; --line:#2a3a41;
+  --accent:#4fb8bf; --accent-soft:#16363a; --match:#f0a050; --match-soft:#3a2a17;
+  --good:#5cc985; --good-soft:#173322; --warn:#f2b44c; --warn-soft:#3a2c12; --bad:#f07a6e; --bad-soft:#3d1c19; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f1619; --surface:#162126; --ink:#e3eaed; --muted:#93a3ab; --line:#2a3a41;
+  --accent:#4fb8bf; --accent-soft:#16363a; --match:#f0a050; --match-soft:#3a2a17;
+  --good:#5cc985; --good-soft:#173322; --warn:#f2b44c; --warn-soft:#3a2c12; --bad:#f07a6e; --bad-soft:#3d1c19; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.app{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px 0}
+.titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13px}
+.status{margin-left:auto;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--good)}.dot.err{background:var(--bad)}
+nav.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+main{padding:16px 20px 40px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+main>*,.grid2>*,main section>*{min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.pad{padding:14px 16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.toolbar input[type=search]{flex:1 1 220px;min-width:160px}
+input[type=search],input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#062326}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px}
+.count{color:var(--muted);font-size:13px;margin-left:auto}
+.tablewrap{overflow:auto;max-height:68vh}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+th{position:sticky;top:0;background:var(--surface);font-size:12px;color:var(--muted);font-weight:600;z-index:1;cursor:pointer;user-select:none}
+th.num,td.num{text-align:right}
+td.desc{white-space:normal;min-width:240px;max-width:380px}
+td.code{font-family:var(--font-mono);font-size:12.5px}
+tr.match td:first-child{box-shadow:inset 3px 0 0 var(--match)}
+tr.match{background:var(--match-soft)}
+tbody tr:hover{background:var(--accent-soft)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;background:var(--match-soft);color:var(--match);border:1px solid var(--match);cursor:pointer}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:10px}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.bad{background:var(--bad-soft);color:var(--bad)}
+a.codelink{color:var(--accent);text-decoration:none;cursor:pointer}
+a.codelink:hover{text-decoration:underline}
+.pager{display:flex;gap:8px;align-items:center;padding:8px 12px;justify-content:flex-end;font-size:13px;color:var(--muted)}
+.colpanel{border-bottom:1px solid var(--line);padding:12px 14px;display:none;gap:12px;background:var(--bg)}
+.colpanel.open{display:grid}
+.colgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tile .k{font-size:12px;color:var(--muted)}.tile .v{font-size:21px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+.bar{height:8px;background:var(--accent);border-radius:4px;min-width:2px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.note{font-size:13px;color:var(--muted)}
+.msg{padding:9px 12px;border-radius:6px;font-size:13px}
+.msg.good{background:var(--good-soft);color:var(--good)}.msg.bad{background:var(--bad-soft);color:var(--bad)}.msg.warn{background:var(--warn-soft);color:var(--warn)}
+dl.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0}
+dl.kv dt{color:var(--muted)}dl.kv dd{margin:0}
+.hidden{display:none!important}
+.idbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--accent-soft)}
+.idbar b{font-weight:600}
+td.sel,th.sel{width:30px;padding-right:0}
+td.dhh{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--accent)}
+.divtag{display:inline-block;font-family:var(--font-mono);font-size:11.5px;font-weight:600;padding:0 6px;border-radius:4px;border:1px solid var(--line);background:var(--bg)}
+.divpanel{border-bottom:1px solid var(--line);padding:12px 14px;background:var(--bg);display:none;gap:10px}
+.divpanel.open{display:grid}
+.lock{color:var(--muted);font-size:11px}
+.kvform{display:grid;grid-template-columns:max-content 1fr;gap:6px 10px;align-items:center}
+.kvform input,.kvform select,.kvform textarea{width:100%}
+.edtable td{vertical-align:middle}
+.edtable input[type=number],.edtable input[type=text]{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px}
+input[type=date],input[type=number]{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;color:var(--ink)}
+.divcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.divcard{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--dc,var(--accent));border-radius:8px;padding:14px 16px;display:grid;gap:10px;align-content:start}
+.divcard h2{display:flex;gap:8px;align-items:center;margin:0}
+.divstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.divstats div{background:var(--bg);border-radius:6px;padding:6px 8px}
+.divstats .k{font-size:11px;color:var(--muted)}.divstats .v{font-weight:700;font-family:var(--font-mono);font-size:14px}
+.divcard .drop{padding:18px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;color:var(--ink)}
+@media (max-width:600px){main{padding:12px}header.app{padding:12px 12px 0}.grid2{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="app">
+  <div class="titlerow">
+    <h1>Implant Product Register</h1>
+    <span class="sub" id="subline">Product lines from supplier invoices</span>
+    <span class="status"><span class="dot" id="dbdot"></span><span id="dbstatus">Connecting to database…</span></span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="pid" aria-selected="true">PID creation</button>
+    <button role="tab" data-tab="lines" aria-selected="false">All lines</button>
+    <button role="tab" data-tab="master" aria-selected="false">Product master</button>
+    <button role="tab" data-tab="sales" aria-selected="false">Sales &amp; stock</button>
+    <button role="tab" data-tab="analysis" aria-selected="false">Analysis</button>
+    <button role="tab" data-tab="invoices" aria-selected="false">Invoices &amp; import</button>
+    <button role="tab" data-tab="export" aria-selected="false">Export &amp; connect</button>
+  </nav>
+</header>
+
+<main>
+  <div id="globalmsg" class="hidden"></div>
+
+  <!-- LINES + MASTER share a table surface -->
+  <section id="tab-pid" style="display:grid;gap:14px">
+    <div class="panel pad"><h2>Upload invoices by division</h2>
+      <p class="note">Drop an invoice into its division's box (the supplier PDF, or the Excel file made earlier). Check the preview, then click <b>Save &amp; create PIDs</b>. Every line of that invoice gets a permanent DHH Product ID: division code + running number (MLS01, MLS02 … MLS99, MLS100). A PID is never changed or reused, even if the invoice is deleted. Uploading the same invoice again keeps its existing PIDs.</p>
+    </div>
+    <div class="divcards" id="divcards"></div>
+    <div class="panel" id="unassignedBox"></div>
+    <div class="panel pad"><h2>Add another division</h2>
+      <div class="row"><input type="text" id="newDivCode" placeholder="Code, e.g. MVS" maxlength="5" style="width:130px" aria-label="New division code"><input type="text" id="newDivName" placeholder="Division name" aria-label="New division name"><button class="btn" id="btnAddDiv">Add division</button><span class="note" id="divnote"></span></div>
+    </div>
+  </section>
+
+  <section id="tab-table" class="panel hidden">
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search code, description, batch, serial…" aria-label="Search">
+      <select id="fInvoice" aria-label="Invoice"><option value="">All invoices</option></select>
+      <select id="fHsn" aria-label="HSN"><option value="">All HSN</option></select>
+      <select id="fExp" aria-label="Expiry">
+        <option value="">Any expiry</option><option value="expired">Expired</option>
+        <option value="6">Expires within 6 months</option><option value="12">Expires within 12 months</option><option value="none">No expiry printed</option>
+      </select>
+      <select id="fDiv" aria-label="Division"><option value="">All divisions</option></select>
+      <select id="fId" aria-label="PID status"><option value="">Any PID status</option><option value="has">Has PID</option><option value="missing">No PID yet</option></select>
+      <select id="fStock" aria-label="Stock"><option value="">Any stock</option><option value="in">In stock</option><option value="out">Sold out</option></select>
+      <label class="chk"><input type="checkbox" id="fMatch"> Matching only</label>
+      <button class="btn" id="btnCols">Columns ▾</button>
+      <button class="btn" id="btnCsv">Export CSV</button>
+      <button class="btn" id="btnXlsx">Export Excel</button>
+      <button class="btn" id="btnCopy">Copy</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="colpanel" id="colpanel">
+      <div class="row">
+        <label for="presetSel"><b>Column set</b></label>
+        <select id="presetSel"></select>
+        <button class="btn" id="btnSavePreset">Save as new set…</button>
+        <button class="btn" id="btnUpdPreset">Update this set</button>
+        <button class="btn danger" id="btnDelPreset">Delete set</button>
+        <span class="note" id="presetNote"></span>
+      </div>
+      <div class="row hidden" id="presetNameRow">
+        <input type="text" id="presetName" placeholder="Name, e.g. Tally stock items" aria-label="Column set name">
+        <button class="btn primary" id="btnPresetOk">Save</button><button class="btn" id="btnPresetCancel">Cancel</button>
+      </div>
+      <div class="colgrid" id="colgrid"></div>
+      <div class="note">The ticked columns are shown in the table and used for CSV, Excel and Copy. Saved sets are stored in the database, so they're there on any device.</div>
+    </div>
+    <div class="idbar hidden" id="selbar">
+      <b id="selinfo">0 lines selected</b>
+      <button class="btn danger" id="btnDelLines">Delete selected lines</button>
+      <button class="btn" id="btnClearSel">Clear selection</button>
+      <span class="note" id="selnote">Deleted lines are removed from their invoice. Their PIDs are retired and never reused.</span>
+    </div>
+    <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+    <div class="pager"><button class="btn" id="prev">‹ Prev</button><span id="pageinfo"></span><button class="btn" id="next">Next ›</button></div>
+  </section>
+
+  <section id="tab-sales" class="hidden" style="display:grid;gap:14px"></section>
+
+  <section id="tab-analysis" class="hidden" style="display:grid;gap:14px"></section>
+
+  <section id="tab-invoices" class="hidden" style="display:grid;gap:14px">
+    <div class="panel pad" id="seedBox" hidden>
+      <h2>Load the two invoices already extracted</h2>
+      <p class="note">Invoices 9426313394 (321 lines) and 9426313395 (833 lines), checked line by line against the PDFs. This adds them to the database once.</p>
+      <button class="btn primary" id="btnSeed">Load 1,154 lines</button>
+    </div>
+    <div class="panel pad note">To add an invoice, use the division boxes on the <b>PID creation</b> tab.</div>
+    <div class="panel">
+      <div class="toolbar"><b>Invoices in the database</b></div>
+      <div class="tablewrap"><table id="invtbl"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="tab-export" class="hidden" style="display:grid;gap:14px">
+    <div class="panel pad">
+      <h2>Use this data in your own website or app</h2>
+      <p class="note">This register is a private page on claude.ai, so your website can't read it live over the internet. Download one of these files and import it into your site's database. Download again after you add invoices here. The SQL file creates two tables, <code>invoices</code> and <code>invoice_items</code>. It works with MySQL/MariaDB and needs only small changes for PostgreSQL.</p>
+      <div class="row">
+        <button class="btn primary" data-exp="sql">Download SQL (MySQL)</button>
+        <button class="btn" data-exp="json">Download JSON (all data)</button>
+        <button class="btn" data-exp="csvall">Download CSV (all lines, all columns)</button>
+        <button class="btn" data-exp="xlsxall">Download Excel (lines + master + invoices)</button>
+      </div>
+      <div id="expmsg" style="margin-top:10px"></div>
+    </div>
+    <div class="panel pad">
+      <h2>For Tally and analysis</h2>
+      <p class="note">Open <b>All lines</b> or <b>Product master</b>, choose a column set under <b>Columns</b> (or tick your own and save it), then use Export CSV or Export Excel. Two ready-made sets are included: “Tally – stock items” for the product master and “Analysis – purchase lines” for all lines. You can change them when you know which fields you need.</p>
+    </div>
+    <div class="panel pad">
+      <h2>Field list</h2>
+      <div class="tablewrap" style="max-height:none"><table id="fieldtbl"><thead><tr><th>Field (export header)</th><th>Key (JSON / SQL column)</th><th>Meaning</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="lib/pdf.min.js"></script>
+<script src="parser.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script>
+"use strict";
+/* ---------- field definitions ---------- */
+const DEFAULT_DIVS=[{code:"MLS",name:"Meril Life Sciences"},{code:"MHC",name:"Meril Healthcare"},{code:"MED",name:"Meril Endo"},{code:"MDG",name:"Meril Diagnostics"}];
+const LINE_FIELDS = [
+  ["dhhId","DHH PID","Permanent DHH Product ID of this line (one per batch / serial line)","id"],["divCode","Division Code","MLS, MHC, MED, MDG …","dv"],["divName","Division","Meril division","t"],
+  ["invoiceNo","Invoice No.","Supplier invoice number","t"],["invoiceDate","Invoice Date","Invoice date (dd.mm.yyyy)","t"],
+  ["supplier","Supplier","Supplier name from invoice","t"],["sr","Sr. No.","Line number on the invoice","n0"],
+  ["hsn","HSN/SAC Code","HSN code","t"],["mat","Material Code","Supplier's product code","c"],
+  ["desc","Description","Description of goods","d"],["batch","Batch No.","Batch / lot number","c"],
+  ["serial","Serial No.","Serial number (implants)","c"],["exp","Expiry Date","Expiry date (dd.mm.yyyy)","t"],
+  ["uom","UOM","Unit of measure","t"],["qty","QTY","Quantity","n0"],["mrp","MRP","Maximum retail price per unit","n2"],
+  ["rate","Rate","Billed rate per unit before discount","n2"],["basic","Basic Amount","QTY × Rate","n2"],
+  ["disc","Discount Amount","Discount on the line","n2"],["discPct","Discount %","Discount ÷ Basic","p"],
+  ["freight","Freight Charges","Freight on the line","n2"],["taxable","Taxable Amount","Basic − Discount + Freight","n2"],
+  ["igstRate","IGST Rate (%)","IGST rate","n2"],["igst","IGST Amount","IGST on the line","n2"],
+  ["lineTotal","Line Total","Taxable + IGST","n2"],["netRate","Net Rate / Unit","Taxable ÷ QTY","n2"],
+  ["soldQty","QTY Sold","Quantity on active tax invoices and delivery challans","n0"],["availQty","QTY Available","Received − sold","n0"],
+  ["matchCount","Match Count","Lines in the database with the same Material Code","n0"]
+];
+const MASTER_FIELDS = [
+  ["mat","Material Code","Supplier's product code","c"],["divCodes","Division Code","Division(s) of this product's lines","t"],["dhhIds","DHH PIDs","IDs of every line of this product","d"],["desc","Description","Description of goods","d"],["hsn","HSN/SAC Code","HSN code","t"],
+  ["uom","UOM","Unit of measure","t"],["igstRate","IGST Rate (%)","GST rate","n2"],["mrp","MRP","Latest MRP","n2"],
+  ["rate","Rate","Latest billed rate per unit","n2"],["discPct","Discount %","Discount on latest purchase","p"],
+  ["netRate","Net Rate / Unit","Latest taxable value per unit","n2"],["lines","Lines","Invoice lines for this product","n0"],
+  ["totalQty","Total QTY","Units received","n0"],["soldQty","QTY Sold","Units sold or out on challan","n0"],["availQty","QTY Available","Units in stock","n0"],["totalTaxable","Total Taxable","Taxable value received","n2"],
+  ["totalIgst","Total IGST","IGST paid","n2"],["batches","Batch Nos.","All batch numbers","d"],
+  ["serials","Serial Nos.","All serial numbers","d"],["nearestExp","Nearest Expiry","Earliest expiry date","t"],
+  ["invoices","Invoices","Invoice numbers","t"],["lastInvoiceDate","Last Invoice Date","Most recent invoice date","t"]
+];
+const DEFAULT_PRESETS = [
+  {id:"_full_lines",name:"Full detail – all lines",view:"lines",cols:LINE_FIELDS.map(f=>f[0]).filter(k=>!["discPct","lineTotal","netRate"].includes(k)),builtin:true},
+  {id:"_analysis",name:"Analysis – purchase lines",view:"lines",cols:["dhhId","divCode","invoiceNo","invoiceDate","mat","desc","hsn","qty","rate","basic","disc","discPct","taxable","igst","lineTotal"],builtin:true},
+  {id:"_full_master",name:"Full detail – product master",view:"master",cols:MASTER_FIELDS.map(f=>f[0]),builtin:true},
+  {id:"_tally",name:"Tally – stock items",view:"master",cols:["mat","divCodes","desc","hsn","uom","igstRate","mrp","rate","netRate","availQty"],builtin:true}
+];
+
+/* ---------- state ---------- */
+const S = { registry:{}, divisions:DEFAULT_DIVS.slice(), counters:{}, sel:new Set(), db:null, invoices:{}, chunks:{}, items:[], master:[], presets:[], tab:"pid",
+  colsLines:DEFAULT_PRESETS[0].cols.slice(), colsMaster:DEFAULT_PRESETS[2].cols.slice(),
+  presetLines:"_full_lines", presetMaster:"_full_master", page:0, sort:null, pending:null, canWrite:true, loaded:false };
+const PAGE = 100;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const inr = (v,d=2) => (v==null||v===""||isNaN(v)) ? "" : Number(v).toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d});
+const r2 = v => Math.round((v + Number.EPSILON) * 100) / 100;
+const toDate = s => { if(!s) return null; const [d,m,y]=s.split("."); return new Date(+y, +m-1, +d); };
+function fmt(v,type){ if(type==="n2") return inr(v,2); if(type==="n0") return inr(v,0); if(type==="p") return v==null?"":(v*100).toFixed(2)+"%"; return esc(v); }
+function msg(el, kind, text){ el.className="msg "+kind; el.textContent=text; el.classList.remove("hidden"); }
+function setStatus(kind,text){ $("dbdot").className="dot "+kind; $("dbstatus").textContent=text; }
+
+/* ---------- derive ---------- */
+function rebuild(){
+  const items=[];
+  for(const inv of Object.values(S.invoices)){
+    const ch = Object.values(S.chunks).filter(c=>c.invoiceNo===inv.invoiceNo).sort((a,b)=>a.k-b.k);
+    const reg=S.registry[inv.invoiceNo]||{}; const RL=reg.lines||{};
+    for(const c of ch) for(const r of c.rows){
+      const e=RL[r.sr]||{}; const conflict=!!(e.id && (e.mat!==r.mat||e.batch!==r.batch||(e.serial||"")!==(r.serial||"")));
+      const divCode=e.div||reg.division||"";
+      items.push({...r, key:inv.invoiceNo+"|"+r.sr, dhhId:e.id||"", idConflict:conflict, divCode, divName:divName(divCode), invoiceNo:inv.invoiceNo, invoiceDate:inv.invoiceDate, supplier:inv.supplier,
+        discPct: r.basic? r.disc/r.basic : null, lineTotal:r2(r.taxable+r.igst), netRate: r.qty? r2(r.taxable/r.qty):null});
+    }
+  }
+  const cnt={}; items.forEach(r=>cnt[r.mat]=(cnt[r.mat]||0)+1);
+  items.forEach(r=>r.matchCount=cnt[r.mat]);
+  if(typeof computeStock==="function") computeStock(items); else items.forEach(r=>{r.soldQty=0;r.availQty=r.qty;});
+  items.sort((a,b)=> (a.invoiceNo<b.invoiceNo?-1:a.invoiceNo>b.invoiceNo?1:0) || a.sr-b.sr);
+  S.items=items;
+  const g={};
+  for(const r of items){
+    const k=r.mat; const d=toDate(r.invoiceDate);
+    const m=g[k] ||= {_d:new Set(),_ids:[],mat:k,desc:r.desc,hsn:r.hsn,uom:r.uom,lines:0,totalQty:0,totalTaxable:0,totalIgst:0,_b:new Set(),_s:new Set(),_i:new Set(),_last:null,nearestExp:"",_ne:null};
+    if(r.divCode) m._d.add(r.divCode); if(r.dhhId) m._ids.push(r.dhhId);
+    m.lines++; m.totalQty+=r.qty; m.soldQty=(m.soldQty||0)+r.soldQty; m.availQty=r2((m.availQty||0)+r.availQty); m.totalTaxable=r2(m.totalTaxable+r.taxable); m.totalIgst=r2(m.totalIgst+r.igst);
+    if(r.batch) m._b.add(r.batch); if(r.serial) m._s.add(r.serial); m._i.add(r.invoiceNo);
+    if(!m._last || d>=m._last){ m._last=d; m.lastInvoiceDate=r.invoiceDate; m.desc=r.desc; m.mrp=r.mrp; m.rate=r.rate; m.discPct=r.discPct; m.netRate=r.netRate; m.igstRate=r.igstRate; m.hsn=r.hsn; m.uom=r.uom; }
+    const e=toDate(r.exp); if(e && (!m._ne || e<m._ne)){ m._ne=e; m.nearestExp=r.exp; }
+  }
+  S.master=Object.values(g).map(m=>({...m,divCodes:[...m._d].join(", "),dhhIds:m._ids.join(", "),batches:[...m._b].join(", "),serials:[...m._s].join(", "),invoices:[...m._i].join(", ")}));
+  S.master.forEach(m=>{m.matchCount=m.lines});
+  fillFilters(); render();
+}
+function divName(c){ const d=S.divisions.find(d=>d.code===c); return d?d.name:(c||""); }
+function fillFilters(){
+  const keepD=$("fDiv").value; $("fDiv").innerHTML='<option value="">All divisions</option>'+S.divisions.map(d=>`<option value="${esc(d.code)}">${esc(d.code)} · ${esc(d.name)}</option>`).join("")+'<option value="_none">Division not set</option>'; $("fDiv").value=keepD;
+
+  const keepI=$("fInvoice").value, keepH=$("fHsn").value;
+  $("fInvoice").innerHTML='<option value="">All invoices</option>'+Object.values(S.invoices).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1).map(i=>`<option value="${esc(i.invoiceNo)}">${esc(i.invoiceNo)} · ${esc(i.invoiceDate)}</option>`).join("");
+  const hs=[...new Set(S.items.map(r=>r.hsn))].sort();
+  $("fHsn").innerHTML='<option value="">All HSN</option>'+hs.map(h=>`<option>${esc(h)}</option>`).join("");
+  $("fInvoice").value=keepI; $("fHsn").value=keepH;
+  const n=Object.keys(S.invoices).length;
+  $("subline").textContent = n ? `${n} invoice${n>1?"s":""} · ${inr(S.items.length,0)} lines · ${inr(S.master.length,0)} products` : "No invoices yet";
+}
+
+/* ---------- filtering ---------- */
+function filtered(){
+  const isM = S.tab==="master";
+  const q=$("q").value.trim().toLowerCase(), fi=$("fInvoice").value, fh=$("fHsn").value, fe=$("fExp").value, fm=$("fMatch").checked, fd=$("fDiv").value, fid=$("fId").value, fs=$("fStock").value;
+  const now=new Date(); const lim = fe==="6"||fe==="12" ? new Date(now.getFullYear(), now.getMonth()+(+fe), now.getDate()) : null;
+  let src = isM ? S.master : S.items;
+  const out = src.filter(r=>{
+    if(fi && !(isM ? r.invoices.split(", ").includes(fi) : r.invoiceNo===fi)) return false;
+    if(fh && r.hsn!==fh) return false;
+    if(fm && r.matchCount<2) return false;
+    if(fs==="in" && !(r.availQty>0)) return false; if(fs==="out" && r.availQty>0) return false;
+    if(fd){ if(fd==="_none"){ if(isM? r.divCodes : r.divCode) return false; } else if(!(isM? r.divCodes.split(", ").includes(fd) : r.divCode===fd)) return false; }
+    if(fid){ const has=isM? !!r.dhhIds : !!r.dhhId; if((fid==="has")!==has) return false; }
+    if(fe){ const e=toDate(isM? r.nearestExp : r.exp);
+      if(fe==="none"){ if(e) return false; } else if(!e) return false;
+      else if(fe==="expired"){ if(e>=now) return false; } else if(e>lim) return false; }
+    if(q){ const hay=(isM? [r.mat,r.desc,r.batches,r.serials,r.hsn,r.dhhIds] : [r.mat,r.desc,r.batch,r.serial,r.hsn,r.invoiceNo,r.dhhId]).join(" ").toLowerCase();
+      if(!q.split(/\s+/).every(w=>hay.includes(w))) return false; }
+    return true;
+  });
+  if(S.sort){ const {k,dir}=S.sort; out.sort((a,b)=>{ let x=a[k],y=b[k];
+    if(k==="exp"||k==="invoiceDate"||k==="nearestExp"||k==="lastInvoiceDate"){x=toDate(x)?.getTime()??Infinity;y=toDate(y)?.getTime()??Infinity;}
+    return (x<y?-1:x>y?1:0)*dir; }); }
+  return out;
+}
+function fieldsFor(view){ return view==="master"?MASTER_FIELDS:LINE_FIELDS; }
+function activeCols(){ const F=fieldsFor(S.tab==="master"?"master":"lines"); const cols=S.tab==="master"?S.colsMaster:S.colsLines; return F.filter(f=>cols.includes(f[0])); }
+
+/* ---------- render table ---------- */
+function render(){
+  if(S.tab==="pid") return renderPid();
+  if(S.tab==="sales") return (typeof renderSales==="function") && renderSales();
+  if(S.tab==="analysis") return renderAnalysis();
+  if(S.tab==="invoices") return renderInvoices();
+  if(S.tab==="export") return;
+  const isM=S.tab==="master"; const cols=activeCols(); const rows=filtered();
+  const pages=Math.max(1,Math.ceil(rows.length/PAGE)); if(S.page>=pages) S.page=pages-1;
+  const slice=rows.slice(S.page*PAGE,(S.page+1)*PAGE);
+  const allSel = !isM && rows.length>0 && rows.every(r=>S.sel.has(r.key));
+  $("tbl").tHead.innerHTML="<tr>"+(isM||!S.canWrite?"":`<th class="sel"><input type="checkbox" id="selAll" aria-label="Select all lines matching the filters" ${allSel?"checked":""}></th>`)+cols.map(f=>`<th class="${/^n|p/.test(f[3])?"num":""}" data-k="${f[0]}" title="${esc(f[2])}">${esc(f[1])}${S.sort&&S.sort.k===f[0]?(S.sort.dir>0?" ▲":" ▼"):""}</th>`).join("")+"</tr>";
+  if(!S.items.length){ $("tbl").tBodies[0].innerHTML=`<tr><td class="empty" colspan="${cols.length}">${S.loaded?"No invoices in the database yet. Open <b>Invoices &amp; import</b> to load or add one.":"Loading…"}</td></tr>`; }
+  else $("tbl").tBodies[0].innerHTML = slice.map(r=>`<tr class="${r.matchCount>1?"match":""}">`+(isM||!S.canWrite?"":`<td class="sel"><input type="checkbox" data-sel="${esc(r.key)}" aria-label="Select line ${esc(r.sr)} of ${esc(r.invoiceNo)}" ${S.sel.has(r.key)?"checked":""}></td>`)+cols.map(f=>{
+    const k=f[0], t=f[3];
+    if(t==="id") return `<td class="dhh">${r.dhhId?esc(r.dhhId)+(r.idConflict?' <span class="pill bad" title="This line changed after its ID was issued">check</span>':""):'<span class="lock">—</span>'}</td>`;
+    if(t==="dv") return `<td>${r.divCode?`<span class="divtag">${esc(r.divCode)}</span>`+(r.dhhId?' <span class="lock" title="Locked: ID issued">🔒</span>':""):'<span class="lock">not set</span>'}</td>`;
+    if(k==="mat") return `<td class="code"><a class="codelink" data-code="${esc(r.mat)}">${esc(r.mat)}</a></td>`;
+    if(k==="matchCount"||k==="lines") return `<td class="num">${r[k]>1?`<span class="badge" data-code="${esc(r.mat)}" title="Show all lines with this code">×${r[k]}</span>`:r[k]}</td>`;
+    const cls = t==="d"?"desc": t==="c"?"code": /^n|p/.test(t)?"num":"";
+    return `<td class="${cls}">${fmt(r[k],t)}</td>`; }).join("")+"</tr>").join("");
+  const matches = rows.filter(r=>r.matchCount>1).length;
+  $("count").textContent = `${inr(rows.length,0)} ${isM?"products":"lines"}` + (isM?"":` · ${inr(matches,0)} matching · ${inr(rows.filter(r=>r.dhhId).length,0)} with PID`);
+  renderIdBar();
+  $("pageinfo").textContent=`Page ${S.page+1} of ${pages}`; $("prev").disabled=S.page===0; $("next").disabled=S.page>=pages-1;
+  renderColPanel();
+}
+const DIVCOLORS={MLS:"#2b6cb0",MHC:"#0b6e75",MED:"#7b3fa0",MDG:"#b45309"};
+function renderIdBar(){ if(S.tab==="pid") renderPid(); renderSelBar(); }
+function renderSelBar(){ const keys=new Set(S.items.map(r=>r.key)); [...S.sel].forEach(k=>{ if(!keys.has(k)) S.sel.delete(k); });
+  $("selbar").classList.toggle("hidden", S.tab!=="lines"||!S.sel.size);
+  const L=S.items.filter(r=>S.sel.has(r.key)); const inv=new Set(L.map(r=>r.invoiceNo));
+  $("selinfo").textContent=`${inr(L.length,0)} line${L.length===1?"":"s"} selected from ${inv.size} invoice${inv.size===1?"":"s"}`+(L.some(r=>r.dhhId)?` · PIDs ${L.filter(r=>r.dhhId).slice(0,3).map(r=>r.dhhId).join(", ")}${L.filter(r=>r.dhhId).length>3?" …":""}`:""); }
+function renderPid(){
+  const cards=$("divcards"); if(!cards) return;
+  for(const d of S.divisions){
+    let c=cards.querySelector(`[data-divcard="${d.code}"]`);
+    if(!c){ c=document.createElement("div"); c.className="divcard"; c.dataset.divcard=d.code; c.style.setProperty("--dc",DIVCOLORS[d.code]||"var(--accent)");
+      c.innerHTML=`<h2><span class="divtag">${esc(d.code)}</span>${esc(d.name)}</h2><div class="divstats"></div>
+        <div class="drop" tabindex="0" role="button" aria-label="Upload ${esc(d.name)} invoice">Drop a <b>${esc(d.name)}</b> invoice here, or click to choose (PDF or Excel)<input type="file" accept=".pdf,.xlsx,.xls" hidden></div>
+        <div class="pv hidden" style="display:grid;gap:10px"></div><div class="divinv note"></div>`;
+      const drop=c.querySelector(".drop"), inp=c.querySelector("input[type=file]"), pv=c.querySelector(".pv");
+      drop.onclick=()=>inp.click(); drop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();inp.click();} };
+      inp.onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0], d.code, pv); e.target.value=""; };
+      drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");}; drop.ondragleave=()=>drop.classList.remove("over");
+      drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over"); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0], d.code, pv);};
+      cards.appendChild(c); }
+    const L=S.items.filter(r=>r.divCode===d.code); const inv=Object.values(S.registry).filter(g=>g.division===d.code).map(g=>g.invoiceNo).filter(no=>S.invoices[no]);
+    const n=S.counters[d.code]||0;
+    c.querySelector(".divstats").innerHTML=`<div><div class="k">Invoices</div><div class="v">${inr(inv.length,0)}</div></div><div><div class="k">PIDs issued</div><div class="v">${inr(n,0)}</div></div><div><div class="k">Next PID</div><div class="v">${esc(fmtId(d.code,n+1))}</div></div>`;
+    c.querySelector(".drop").classList.toggle("hidden",!S.canWrite||!S.db);
+    c.querySelector(".divinv").innerHTML= inv.length? inv.sort().map(no=>{ const LL=L.filter(r=>r.invoiceNo===no&&r.dhhId).map(r=>r.dhhId); return `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:6px"><span><b>${esc(no)}</b> · ${inr(L.filter(r=>r.invoiceNo===no).length,0)} lines · ${LL.length?esc(LL[0])+" … "+esc(LL[LL.length-1]):"no PIDs"}</span>${S.canWrite?`<button class="btn danger" data-del="${esc(no)}">Delete invoice</button>`:""}</div>`; }).join("") : "No invoices yet.";
+  }
+  const un=Object.values(S.invoices).filter(i=>S.items.some(r=>r.invoiceNo===i.invoiceNo&&!r.dhhId)).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1);
+  const box=$("unassignedBox"); box.classList.toggle("hidden",!un.length);
+  if(un.length) box.innerHTML=`<div class="toolbar"><b>Invoices without PIDs</b><span class="count">Choose the division and create their PIDs</span></div><div class="tablewrap"><table><thead><tr><th>Invoice No.</th><th>Date</th><th>Supplier</th><th class="num">Lines without PID</th><th>Division</th><th></th></tr></thead><tbody>${un.map(i=>{ const k=S.items.filter(r=>r.invoiceNo===i.invoiceNo&&!r.dhhId).length; const cur=(S.registry[i.invoiceNo]||{}).division||"";
+    return `<tr><td class="code">${esc(i.invoiceNo)}</td><td>${esc(i.invoiceDate)}</td><td>${esc(i.supplier)}</td><td class="num">${inr(k,0)}</td><td><select data-undiv="${esc(i.invoiceNo)}" aria-label="Division for ${esc(i.invoiceNo)}"><option value="">— choose —</option>${S.divisions.map(d=>`<option value="${esc(d.code)}" ${cur===d.code?"selected":""}>${esc(d.code)} · ${esc(d.name)}</option>`).join("")}</select></td><td><button class="btn primary" data-mkpid="${esc(i.invoiceNo)}" ${S.canWrite?"":"disabled"}>Create PIDs</button> <span class="note" data-unnote="${esc(i.invoiceNo)}"></span></td></tr>`; }).join("")}</tbody></table></div>`;
+}
+function fmtId(code,n){ return code+String(n).padStart(2,"0"); }
+function renderColPanel(){
+  const view=S.tab==="master"?"master":"lines"; const F=fieldsFor(view); const cols=view==="master"?S.colsMaster:S.colsLines;
+  $("colgrid").innerHTML=F.map(f=>`<label class="chk"><input type="checkbox" data-col="${f[0]}" ${cols.includes(f[0])?"checked":""}> ${esc(f[1])}</label>`).join("");
+  const ps=allPresets().filter(p=>p.view===view); const cur=view==="master"?S.presetMaster:S.presetLines;
+  $("presetSel").innerHTML=ps.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}${p.builtin?"":" (saved)"}</option>`).join("")+(ps.some(p=>p.id===cur)?"":`<option value="" selected>Custom (unsaved)</option>`);
+  if(ps.some(p=>p.id===cur)) $("presetSel").value=cur;
+  const p=ps.find(p=>p.id===cur); $("btnUpdPreset").disabled=!p||p.builtin||!S.canWrite; $("btnDelPreset").disabled=!p||p.builtin||!S.canWrite; $("btnSavePreset").disabled=!S.canWrite;
+}
+function allPresets(){ return [...DEFAULT_PRESETS, ...S.presets]; }
+
+/* ---------- analysis ---------- */
+function renderAnalysis(){
+  const el=$("tab-analysis"); const I=S.items;
+  if(!I.length){ el.innerHTML=`<div class="panel empty">${S.loaded?"No data yet. Add invoices first.":"Loading…"}</div>`; return; }
+  const sum=k=>r2(I.reduce((a,r)=>a+r[k],0));
+  const tiles=[["Invoices",Object.keys(S.invoices).length,0],["Invoice lines",I.length,0],["Unique products",S.master.length,0],["Units received",sum("qty"),0],["Units sold / out",sum("soldQty"),0],["Units in stock",sum("availQty"),0],["Taxable value (₹)",sum("taxable"),2],["IGST (₹)",sum("igst"),2]];
+  const byInv=Object.values(S.invoices).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1).map(inv=>{ const L=I.filter(r=>r.invoiceNo===inv.invoiceNo);
+    const t={lines:L.length,qty:L.reduce((a,r)=>a+r.qty,0),basic:r2(L.reduce((a,r)=>a+r.basic,0)),disc:r2(L.reduce((a,r)=>a+r.disc,0)),taxable:r2(L.reduce((a,r)=>a+r.taxable,0)),igst:r2(L.reduce((a,r)=>a+r.igst,0))};
+    return {inv,t,ok:totalsOk(t,inv.footer)}; });
+  const hsn={}; I.forEach(r=>{const h=hsn[r.hsn] ||= {lines:0,qty:0,taxable:0,igst:0}; h.lines++; h.qty+=r.qty; h.taxable=r2(h.taxable+r.taxable); h.igst=r2(h.igst+r.igst);});
+  const top=[...S.master].sort((a,b)=>b.totalTaxable-a.totalTaxable).slice(0,15); const max=top[0]?.totalTaxable||1;
+  const now=new Date(); const m=n=>new Date(now.getFullYear(),now.getMonth()+n,now.getDate());
+  const ex={expired:0,"6":0,"12":0,"24":0,later:0,none:0};
+  I.forEach(r=>{const e=toDate(r.exp); if(!e) ex.none+=r.qty; else if(e<now) ex.expired+=r.qty; else if(e<=m(6)) ex["6"]+=r.qty; else if(e<=m(12)) ex["12"]+=r.qty; else if(e<=m(24)) ex["24"]+=r.qty; else ex.later+=r.qty;});
+  const disc = sum("basic")? sum("disc")/sum("basic"):0;
+  el.innerHTML=`
+  <div class="tiles">${tiles.map(t=>`<div class="tile"><div class="k">${t[0]}</div><div class="v">${inr(t[1],t[2])}</div></div>`).join("")}</div>
+  <div class="panel"><div class="toolbar"><b>By invoice</b><span class="count">Average discount on basic: ${(disc*100).toFixed(2)}%</span></div><div class="tablewrap"><table>
+    <thead><tr><th>Invoice</th><th>Date</th><th class="num">Lines</th><th class="num">QTY</th><th class="num">Basic</th><th class="num">Discount</th><th class="num">Taxable</th><th class="num">IGST</th><th>Check vs printed totals</th></tr></thead>
+    <tbody>${byInv.map(x=>`<tr><td class="code">${esc(x.inv.invoiceNo)}</td><td>${esc(x.inv.invoiceDate)}</td><td class="num">${inr(x.t.lines,0)}</td><td class="num">${inr(x.t.qty,0)}</td><td class="num">${inr(x.t.basic)}</td><td class="num">${inr(x.t.disc)}</td><td class="num">${inr(x.t.taxable)}</td><td class="num">${inr(x.t.igst)}</td><td>${checkPill(x.ok,x.inv)}</td></tr>`).join("")}</tbody></table></div></div>
+  <div class="grid2">
+    <div class="panel"><div class="toolbar"><b>Top 15 products by taxable value</b></div><div class="tablewrap"><table>
+      <thead><tr><th>Material Code</th><th>Description</th><th class="num">QTY</th><th class="num">Taxable (₹)</th><th style="width:28%"></th></tr></thead>
+      <tbody>${top.map(p=>`<tr><td class="code"><a class="codelink" data-code="${esc(p.mat)}">${esc(p.mat)}</a></td><td class="desc">${esc(p.desc)}</td><td class="num">${inr(p.totalQty,0)}</td><td class="num">${inr(p.totalTaxable)}</td><td><div class="bar" style="width:${(p.totalTaxable/max*100).toFixed(1)}%"></div></td></tr>`).join("")}</tbody></table></div></div>
+    <div style="display:grid;gap:14px;align-content:start">
+      <div class="panel"><div class="toolbar"><b>By division</b></div><div class="tablewrap"><table>
+        <thead><tr><th>Division</th><th class="num">Lines</th><th class="num">QTY</th><th class="num">Taxable (₹)</th><th class="num">PIDs issued</th></tr></thead>
+        <tbody>${[...S.divisions.map(d=>d.code),""].map(c=>{ const L=I.filter(r=>r.divCode===c); if(!L.length) return ""; return `<tr><td>${c?`<span class="divtag">${esc(c)}</span> ${esc(divName(c))}`:'<span class="lock">Not set</span>'}</td><td class="num">${inr(L.length,0)}</td><td class="num">${inr(L.reduce((a,r)=>a+r.qty,0),0)}</td><td class="num">${inr(r2(L.reduce((a,r)=>a+r.taxable,0)))}</td><td class="num">${inr(L.filter(r=>r.dhhId).length,0)}</td></tr>`; }).join("")}</tbody></table></div></div>
+      <div class="panel"><div class="toolbar"><b>By HSN code</b></div><div class="tablewrap"><table>
+        <thead><tr><th>HSN</th><th class="num">Lines</th><th class="num">QTY</th><th class="num">Taxable (₹)</th><th class="num">IGST (₹)</th></tr></thead>
+        <tbody>${Object.entries(hsn).sort().map(([h,v])=>`<tr><td class="code">${esc(h)}</td><td class="num">${inr(v.lines,0)}</td><td class="num">${inr(v.qty,0)}</td><td class="num">${inr(v.taxable)}</td><td class="num">${inr(v.igst)}</td></tr>`).join("")}</tbody></table></div></div>
+      <div class="panel"><div class="toolbar"><b>Units by expiry</b><span class="count">as of today</span></div><div class="tablewrap"><table>
+        <thead><tr><th>Expiry</th><th class="num">Units</th><th></th></tr></thead><tbody>
+        ${[["Expired","expired","bad"],["Within 6 months","6","bad"],["6–12 months","12","warn"],["12–24 months","24","warn"],["Later than 24 months","later","good"],["No expiry printed","none",""]].map(([l,k,c])=>`<tr><td>${l}</td><td class="num">${inr(ex[k],0)}</td><td>${c&&ex[k]?`<span class="pill ${c}">${c==="good"?"OK":c==="warn"?"Watch":"Act"}</span>`:""}</td></tr>`).join("")}
+        </tbody></table></div></div>
+      <div class="panel"><div class="toolbar"><b>Matching products</b></div><div class="pad note">${inr(S.master.filter(m=>m.lines>1).length,0)} material codes appear on more than one line, covering ${inr(I.filter(r=>r.matchCount>1).length,0)} lines. In <b>All lines</b>, tick <b>Matching only</b> to list them.</div></div>
+    </div>
+  </div>`;
+}
+function checkPill(ok,inv){ const rm=(inv&&inv.removedLines||[]).length;
+  if(rm) return `<span class="pill warn" title="Totals differ from the printed invoice because lines were deleted">${rm} line${rm===1?"":"s"} deleted</span>`;
+  return ok===null?'<span class="pill warn">No printed totals</span>':ok?'<span class="pill good">Matches invoice</span>':'<span class="pill bad">Differs</span>'; }
+function totalsOk(t,f){ if(!f) return null; return Math.abs(t.basic-f.basic)<0.006&&Math.abs(t.disc-f.disc)<0.006&&Math.abs(t.taxable-f.taxable)<0.006&&Math.abs(t.igst-f.igst)<0.006; }
+
+/* ---------- invoices tab ---------- */
+function renderInvoices(){
+  $("seedBox").hidden = !(S.loaded && S.db && !Object.keys(S.invoices).length && S.canWrite);
+  const inv=Object.values(S.invoices).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1);
+  $("invtbl").tHead.innerHTML="<tr><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Buyer</th><th class='num'>Lines</th><th class='num'>Taxable (₹)</th><th class='num'>IGST (₹)</th><th class='num'>Invoice value (₹)</th><th>Division</th><th class='num'>PIDs</th><th>Check</th><th>Source</th><th></th></tr>";
+  $("invtbl").tBodies[0].innerHTML = inv.length? inv.map(i=>{ const L=S.items.filter(r=>r.invoiceNo===i.invoiceNo);
+    const t={basic:r2(L.reduce((a,r)=>a+r.basic,0)),disc:r2(L.reduce((a,r)=>a+r.disc,0)),taxable:r2(L.reduce((a,r)=>a+r.taxable,0)),igst:r2(L.reduce((a,r)=>a+r.igst,0))}; const ok=totalsOk(t,i.footer);
+    return `<tr><td class="code">${esc(i.invoiceNo)}</td><td>${esc(i.invoiceDate)}</td><td>${esc(i.supplier)}</td><td>${esc(i.buyer)}</td><td class="num">${inr(L.length,0)}</td><td class="num">${inr(t.taxable)}</td><td class="num">${inr(t.igst)}</td><td class="num">${inr(i.invoiceValue)}</td><td>${(S.registry[i.invoiceNo]||{}).division?`<span class="divtag">${esc(S.registry[i.invoiceNo].division)}</span> ${esc(divName(S.registry[i.invoiceNo].division))}`:'<span class="lock">not set</span>'}</td><td class="num">${inr(L.filter(r=>r.dhhId).length,0)} / ${inr(L.length,0)}</td><td>${checkPill(ok,i)}</td><td class="note">${esc(i.sourceFile||"")}</td><td>${S.canWrite?`<button class="btn danger" data-del="${esc(i.invoiceNo)}">Delete</button>`:""}</td></tr>`; }).join("")
+    : `<tr><td colspan="13" class="empty">${S.loaded?"No invoices yet.":"Loading…"}</td></tr>`;
+}
+
+/* ---------- import ---------- */
+async function handleFile(f, div, pv){
+  pv.classList.remove("hidden"); pv.innerHTML=`<div class="msg warn">Reading ${esc(f.name)}…</div>`;
+  try{
+    const buf=new Uint8Array(await f.arrayBuffer()); let parsed;
+    if(/\.pdf$/i.test(f.name)){
+      pdfjsLib.GlobalWorkerOptions.workerSrc="lib/pdf.worker.min.js";
+      parsed=parseInvoiceLines(await pdfToLines(pdfjsLib, buf));
+    } else parsed=parseSheet(buf, f.name);
+    parsed.sourceFile=f.name; parsed.div=div; S.pending=parsed; showPreview(pv);
+  }catch(e){ console.error(e); pv.innerHTML=`<div class="msg bad">Couldn't read ${esc(f.name)}: ${esc(e.message||e)}. Use a PDF in the same supplier format, or the Excel file made earlier.</div>`; }
+}
+function parseSheet(buf,name){
+  const wb=XLSX.read(buf,{type:"array",cellDates:true});
+  const ws=wb.Sheets["Invoice Items"]||wb.Sheets[wb.SheetNames[0]];
+  const A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+  const hi=A.findIndex(r=>r.some(c=>/^\s*material code\s*$/i.test(String(c)))); if(hi<0) throw new Error("no 'Material Code' header row found");
+  const H=A[hi].map(c=>String(c).toLowerCase().trim());
+  const col=(...names)=>H.findIndex(h=>names.some(n=>h.startsWith(n)));
+  const ix={sr:col("sr"),hsn:col("hsn"),mat:col("material code"),desc:col("description"),batch:col("batch"),serial:col("serial"),exp:col("expiry"),uom:col("uom"),qty:col("qty"),mrp:col("mrp"),rate:col("rate"),basic:col("basic"),disc:col("discount amount","discount"),freight:col("freight"),taxable:col("taxable"),igstRate:col("igst rate"),igst:col("igst amount")};
+  const num=v=>v===""?0:parseFloat(String(v).replace(/,/g,"").replace(/-$/,""));
+  const dstr=v=>{ if(v instanceof Date) return [v.getDate(),v.getMonth()+1,v.getFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); return String(v||"").trim(); };
+  const rows=[];
+  for(const r of A.slice(hi+1)){ const mat=String(r[ix.mat]||"").trim(); if(!mat||!/\d/.test(String(r[ix.sr]))) continue;
+    rows.push({sr:parseInt(r[ix.sr]),hsn:String(r[ix.hsn]),mat,desc:String(r[ix.desc]),batch:String(r[ix.batch]||""),serial:ix.serial>=0?String(r[ix.serial]||""):"",exp:dstr(r[ix.exp]),uom:String(r[ix.uom]),qty:num(r[ix.qty]),mrp:num(r[ix.mrp]),rate:num(r[ix.rate]),basic:num(r[ix.basic]),disc:num(r[ix.disc]),freight:ix.freight>=0?num(r[ix.freight]):0,taxable:num(r[ix.taxable]),igstRate:num(r[ix.igstRate]),igst:num(r[ix.igst])}); }
+  const title=A.slice(0,hi).flat().join(" ");
+  const head={invoiceNo:(title.match(/Invoice No\.?\s*(\d+)/i)||[])[1]||"",invoiceDate:(title.match(/dated\s*(\d{2}\.\d{2}\.\d{4})/i)||[])[1]||"",supplier:(title.match(/^\s*(.*?)\s+[–-]\s+Invoice/i)||[])[1]||"",buyer:"",invoiceValue:null};
+  let footer=null; const fr=A.findIndex(r=>/invoice footer totals/i.test(r.join(" ")));
+  if(fr>=0){ const r=A[fr]; footer={basic:num(r[ix.basic]),disc:num(r[ix.disc]),taxable:num(r[ix.taxable]),igst:num(r[ix.igst])}; }
+  const vr=A.find(r=>/invoice value/i.test(r.join(" "))); if(vr) head.invoiceValue=num(vr.filter(c=>typeof c==="number").pop()??"");
+  return {head,rows,footer};
+}
+function showPreview(pv){
+  const p=S.pending; const R=p.rows; const q=sel=>pv.querySelector(sel);
+  const t={basic:r2(R.reduce((a,r)=>a+r.basic,0)),disc:r2(R.reduce((a,r)=>a+r.disc,0)),taxable:r2(R.reduce((a,r)=>a+r.taxable,0)),igst:r2(R.reduce((a,r)=>a+r.igst,0))};
+  const ok=totalsOk(t,p.footer); const seq=R.every((r,i)=>r.sr===i+1);
+  const exists=!!S.invoices[p.head.invoiceNo];
+  pv.innerHTML=`
+   <div class="${R.length?(ok===false||!seq?"msg bad":ok?"msg good":"msg warn"):"msg bad"}">${R.length?`Found ${inr(R.length,0)} product lines. `+(ok?"The totals match the totals printed on the invoice.":ok===false?"The totals do NOT match the printed totals. Check the file before saving.":"No printed totals were found to check against.")+(seq?"":" Line numbers are not continuous."):"No product lines found in this file."}</div>
+   <dl class="kv">
+     <dt><label for="pInv">Invoice No.</label></dt><dd><input type="text" id="pInv" class="pInv" value="${esc(p.head.invoiceNo)}"></dd>
+     <dt><label for="pDate">Invoice Date</label></dt><dd><input type="text" id="pDate" class="pDate" value="${esc(p.head.invoiceDate)}" placeholder="dd.mm.yyyy"></dd>
+     <dt><label for="pSup">Supplier</label></dt><dd><input type="text" id="pSup" class="pSup" value="${esc(p.head.supplier)}" style="width:min(420px,100%)"></dd>
+     <dt>Buyer</dt><dd>${esc(p.head.buyer||"—")}</dd>
+     <dt>Extracted totals</dt><dd>Basic ${inr(t.basic)} · Discount ${inr(t.disc)} · Taxable ${inr(t.taxable)} · IGST ${inr(t.igst)}</dd>
+     <dt>Printed totals</dt><dd>${p.footer?`Basic ${inr(p.footer.basic)} · Discount ${inr(p.footer.disc)} · Taxable ${inr(p.footer.taxable)} · IGST ${inr(p.footer.igst)}`:"—"}</dd>
+   </dl>
+   ${exists?`<div class="msg warn">Invoice ${esc(p.head.invoiceNo)} is already in the database${(S.registry[p.head.invoiceNo]||{}).division&&(S.registry[p.head.invoiceNo]||{}).division!==p.div?` under ${esc(S.registry[p.head.invoiceNo].division)}`:""}. Saving replaces its lines; PIDs already issued stay the same.</div>`:""}
+   <div class="row"><button class="btn primary" data-act="save" ${R.length&&S.canWrite&&ok!==false&&seq?"":"disabled"}>Save &amp; create ${esc(p.div)} PIDs</button><button class="btn" data-act="discard">Discard</button><span class="note" data-act="note"></span></div>`;
+  q('[data-act=save]').onclick=async e=>{ e.target.disabled=true; const note=t=>q('[data-act=note]').textContent=t;
+    const pp={...p, head:{...p.head, invoiceNo:q('.pInv').value.trim(), invoiceDate:q('.pDate').value.trim(), supplier:q('.pSup').value.trim()}};
+    try{ note("Saving invoice…"); await saveInvoice(pp,true); note("Creating PIDs…");
+      const res=await createPids(pp.head.invoiceNo, p.div, pp.rows);
+      pv.innerHTML=`<div class="msg good">Saved invoice ${esc(pp.head.invoiceNo)} (${inr(pp.rows.length,0)} lines). ${res.count?`Created ${inr(res.count,0)} PIDs: ${esc(res.first)} … ${esc(res.last)}.`:"All lines already had PIDs."}</div>`; S.pending=null; }
+    catch(err){ e.target.disabled=false; note("Stopped: "+(err.message||err.code)+". Nothing issued twice. Try again."); } };
+  q('[data-act=discard]').onclick=()=>{S.pending=null; pv.classList.add("hidden");};
+}
+const CHUNK=100;
+async function saveInvoice(p, quiet){
+  const no=p.head.invoiceNo; if(!/^[A-Za-z0-9_\-.]+$/.test(no)){ if(!quiet) $("saveNote").textContent="Enter a valid invoice number (letters, digits, - _ .)."; throw new Error("bad invoice no"); }
+  if(!S.db) throw new Error("database unavailable");
+  const note=t=>{ if(!quiet&&$("saveNote")) $("saveNote").textContent=t; };
+  if(S.invoices[no]) await deleteInvoice(no, true);
+  const n=Math.ceil(p.rows.length/CHUNK);
+  for(let k=0;k<n;k++){ note(`Saving part ${k+1} of ${n}…`);
+    await S.db.doc(`chunks/${no}_${String(k).padStart(3,"0")}`).set({invoiceNo:no,k,rows:p.rows.slice(k*CHUNK,(k+1)*CHUNK)}); }
+  await S.db.doc(`invoices/${no}`).set({invoiceNo:no,invoiceDate:p.head.invoiceDate||"",supplier:p.head.supplier||"",supplierGstin:p.head.supplierGstin||"",buyer:p.head.buyer||"",buyerGstin:p.head.buyerGstin||"",dcNo:p.head.dcNo||"",soNo:p.head.soNo||"",invoiceValue:isFinite(p.head.invoiceValue)?p.head.invoiceValue:null,footer:p.footer||null,rowCount:p.rows.length,chunkCount:n,sourceFile:p.sourceFile||"",importedAt:new Date().toISOString()});
+  note("Saved."); if(!quiet){ S.pending=null; setTimeout(()=>$("preview").classList.add("hidden"),1200); }
+}
+async function retirePids(no, srs, reason){
+  const ref=S.db.doc(`registry/${no}`); const snap=await ref.get(); if(!snap.exists) return 0;
+  const g=snap.data(); const d={invoiceNo:no,division:g.division||"",lines:JSON.parse(JSON.stringify(g.lines||{})),retired:JSON.parse(JSON.stringify(g.retired||[]))};
+  const now=new Date().toISOString(); let n=0;
+  for(const sr of (srs||Object.keys(d.lines))){ const e=d.lines[sr]; if(!e) continue; if(e.id){ d.retired.push({...e,sr:+sr,retiredAt:now,reason}); n++; } delete d.lines[sr]; }
+  await ref.set(d); S.registry[no]=d; return n;
+}
+function soldOn(keys){ return S.items.filter(r=>keys.includes(r.key)&&r.soldQty>0); }
+async function removeInvoice(no){ const sold=soldOn(S.items.filter(r=>r.invoiceNo===no).map(r=>r.key)); if(sold.length) throw new Error(`${sold.length} line${sold.length===1?" has":"s have"} been sold or sent on a challan (${sold.slice(0,3).map(r=>r.dhhId||r.mat).join(", ")}${sold.length>3?" …":""}). Cancel those sales documents first`); const n=await retirePids(no,null,"invoice deleted"); await deleteInvoice(no); return n; }
+async function deleteLines(keys){
+  const sold=soldOn(keys); if(sold.length) throw new Error(`${sold.length} selected line${sold.length===1?" has":"s have"} been sold or sent on a challan (${sold.slice(0,3).map(r=>r.dhhId||r.mat).join(", ")}${sold.length>3?" …":""}). Cancel those sales documents first, or untick them`);
+  const byInv={}; for(const k of keys){ const [no,sr]=k.split("|"); (byInv[no] ||= new Set()).add(+sr); }
+  let lines=0, pids=0;
+  for(const [no,srs] of Object.entries(byInv)){
+    const inv=S.invoices[no]; if(!inv) continue;
+    const ch=Object.entries(S.chunks).filter(([,c])=>c.invoiceNo===no);
+    const left=ch.reduce((a,[,c])=>a+c.rows.filter(r=>!srs.has(r.sr)).length,0);
+    if(!left){ pids+=await removeInvoice(no); lines+=srs.size; continue; }
+    const removed=[];
+    for(const [id,c] of ch){ const keep=c.rows.filter(r=>!srs.has(r.sr)); if(keep.length===c.rows.length) continue;
+      c.rows.filter(r=>srs.has(r.sr)).forEach(r=>removed.push(r));
+      await S.db.doc(`chunks/${id}`).set({invoiceNo:no,k:c.k,rows:keep}); }
+    pids+=await retirePids(no,[...srs].map(String),"line deleted");
+    const now=new Date().toISOString();
+    await S.db.doc(`invoices/${no}`).set({...inv,rowCount:left,removedLines:[...(inv.removedLines||[]),...removed.map(r=>({sr:r.sr,mat:r.mat,batch:r.batch,serial:r.serial||"",pid:((S.registry[no]||{}).retired||[]).filter(e=>e.sr===r.sr).map(e=>e.id).pop()||"",qty:r.qty,taxable:r.taxable,removedAt:now}))]});
+    lines+=removed.length;
+  }
+  return {lines,pids};
+}
+$("tbl").addEventListener("change",e=>{
+  if(e.target.id==="selAll"){ filtered().forEach(r=> e.target.checked? S.sel.add(r.key) : S.sel.delete(r.key)); render(); return; }
+  const k=e.target.dataset.sel; if(k){ e.target.checked? S.sel.add(k) : S.sel.delete(k); renderSelBar(); }
+});
+$("btnClearSel").onclick=()=>{ S.sel.clear(); render(); };
+$("btnDelLines").onclick=async e=>{ const b=e.target; const n=S.sel.size; if(!n) return;
+  if(!b.dataset.confirm){ b.dataset.confirm="1"; b.textContent=`Click again to delete ${n} line${n===1?"":"s"}`; setTimeout(()=>{ delete b.dataset.confirm; b.textContent="Delete selected lines"; },4000); return; }
+  delete b.dataset.confirm; b.disabled=true; b.textContent="Deleting…";
+  try{ const res=await deleteLines([...S.sel]); S.sel.clear(); msg($("globalmsg"),"good",`Deleted ${res.lines} line${res.lines===1?"":"s"}.`+(res.pids?` ${res.pids} PID${res.pids===1?"":"s"} retired (never reused).`:"")); }
+  catch(err){ const m=err.message||err.code; msg($("globalmsg"),"bad","Delete failed: "+m+(/Cancel those sales/.test(m)?". Nothing was deleted.":". Some lines may already be deleted; check the list.")); }
+  b.disabled=false; b.textContent="Delete selected lines"; render(); };
+async function deleteInvoice(no, silent){
+  const ch=Object.entries(S.chunks).filter(([,c])=>c.invoiceNo===no).map(([id])=>id);
+  await S.db.doc(`invoices/${no}`).delete();
+  for(const id of ch) await S.db.doc(`chunks/${id}`).delete();
+}
+
+/* ---------- export ---------- */
+let downloads=null;
+async function save(filename,data){
+  if(!downloads){ msg($("globalmsg"),"bad","Downloads aren't available in this view. Use Copy instead, or open the page on claude.ai."); return; }
+  try{ await downloads.save({filename,data}); }catch(e){ if(e&&e.code!=="declined") msg($("globalmsg"),"bad","The download didn't start: "+(e.message||e.code)); }
+}
+function tableAoA(){ const cols=activeCols(); const rows=filtered(); return [cols.map(c=>c[1]), ...rows.map(r=>cols.map(c=>{const v=r[c[0]]; return c[3]==="p"? (v==null?"":r2(v*100)) : (v??"");}))]; }
+function csv(aoa){ return "﻿"+aoa.map(r=>r.map(v=>{const s=String(v??""); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(",")).join("\r\n"); }
+function stamp(){ const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
+function viewName(){ const p=allPresets().find(p=>p.id===(S.tab==="master"?S.presetMaster:S.presetLines)); return (p?p.name:(S.tab==="master"?"Product master":"Lines")).replace(/[^\w\- ]+/g,"").replace(/\s+/g,"_"); }
+function xlsxFrom(sheets){ const wb=XLSX.utils.book_new(); for(const [n,aoa] of sheets){ const ws=XLSX.utils.aoa_to_sheet(aoa); ws["!cols"]=aoa[0].map((h,i)=>({wch:Math.min(50,Math.max(String(h).length+2,...aoa.slice(1,200).map(r=>String(r[i]??"").length+1)))})); XLSX.utils.book_append_sheet(wb,ws,n.slice(0,31)); } return new Uint8Array(XLSX.write(wb,{type:"array",bookType:"xlsx"})); }
+function aoaFor(fields, rows){ return [fields.map(f=>f[1]), ...rows.map(r=>fields.map(f=>{const v=r[f[0]]; return f[3]==="p"?(v==null?"":r2(v*100)):(v??"");}))]; }
+function sqlDump(){
+  const q=v=>v==null||v===""?"NULL":typeof v==="number"?String(v):"'"+String(v).replace(/\\/g,"\\\\").replace(/'/g,"''")+"'";
+  const d=s=>{ if(!s) return "NULL"; const [dd,mm,yy]=s.split("."); return `'${yy}-${mm}-${dd}'`; };
+  let s=`-- Implant Product Register export ${new Date().toISOString()}\n-- MySQL / MariaDB\nSET NAMES utf8mb4;\n\nCREATE TABLE IF NOT EXISTS invoices (\n  invoice_no VARCHAR(40) PRIMARY KEY,\n  invoice_date DATE,\n  supplier VARCHAR(200), supplier_gstin VARCHAR(20),\n  buyer VARCHAR(200), buyer_gstin VARCHAR(20),\n  dc_no VARCHAR(40), so_no VARCHAR(40),\n  invoice_value DECIMAL(14,2),\n  printed_basic DECIMAL(14,2), printed_discount DECIMAL(14,2), printed_taxable DECIMAL(14,2), printed_igst DECIMAL(14,2),\n  line_count INT, source_file VARCHAR(255), imported_at VARCHAR(40)\n);\n\nCREATE TABLE IF NOT EXISTS invoice_items (\n  invoice_no VARCHAR(40) NOT NULL,\n  sr_no INT NOT NULL,\n  dhh_product_id VARCHAR(20), division_code VARCHAR(10), division_name VARCHAR(100),\n  hsn_code VARCHAR(12), material_code VARCHAR(60) NOT NULL, description VARCHAR(400),\n  batch_no VARCHAR(40), serial_no VARCHAR(40), expiry_date DATE, uom VARCHAR(10),\n  qty DECIMAL(12,3), mrp DECIMAL(14,2), rate DECIMAL(14,2), basic_amount DECIMAL(14,2), discount_amount DECIMAL(14,2),\n  freight DECIMAL(14,2), taxable_amount DECIMAL(14,2), igst_rate DECIMAL(5,2), igst_amount DECIMAL(14,2), qty_sold DECIMAL(12,3), qty_available DECIMAL(12,3),\n  PRIMARY KEY (invoice_no, sr_no),\n  UNIQUE KEY uq_dhh_product_id (dhh_product_id), KEY idx_division (division_code),\n  KEY idx_material (material_code), KEY idx_batch (batch_no), KEY idx_serial (serial_no)\n);\n\n`;
+  for(const i of Object.values(S.invoices)){ const f=i.footer||{};
+    s+=`REPLACE INTO invoices VALUES (${q(i.invoiceNo)},${d(i.invoiceDate)},${q(i.supplier)},${q(i.supplierGstin)},${q(i.buyer)},${q(i.buyerGstin)},${q(i.dcNo)},${q(i.soNo)},${q(i.invoiceValue)},${q(f.basic)},${q(f.disc)},${q(f.taxable)},${q(f.igst)},${q(i.rowCount)},${q(i.sourceFile)},${q(i.importedAt)});\n`; }
+  s+="\n";
+  s+=(typeof salesSql==="function"?salesSql(q,d):"")+"\n";
+  for(let k=0;k<S.items.length;k+=200){ s+="REPLACE INTO invoice_items VALUES\n"+S.items.slice(k,k+200).map(r=>`(${q(r.invoiceNo)},${r.sr},${q(r.dhhId)},${q(r.divCode)},${q(r.divName)},${q(r.hsn)},${q(r.mat)},${q(r.desc)},${q(r.batch)},${q(r.serial)},${d(r.exp)},${q(r.uom)},${r.qty},${r.mrp},${r.rate},${r.basic},${r.disc},${r.freight},${r.taxable},${r.igstRate},${r.igst},${r.soldQty||0},${r.availQty??r.qty})`).join(",\n")+";\n\n"; }
+  return s;
+}
+async function doExport(kind){
+  if(!S.items.length){ msg($("expmsg"),"warn","There's no data to export yet."); return; }
+  const base="implant_register_"+stamp();
+  if(kind==="sql") return save(base+".sql.txt", sqlDump());
+  if(kind==="json") return save(base+".json", JSON.stringify({exportedAt:new Date().toISOString(),invoices:Object.values(S.invoices),divisions:S.divisions,items:S.items.map(({matchCount,discPct,lineTotal,netRate,supplier,invoiceDate,key,idConflict,...r})=>r),sales:S.sales,customers:S.customers},null,1));
+  if(kind==="csvall") return save(base+"_lines.csv", csv(aoaFor(LINE_FIELDS,S.items)));
+  if(kind==="xlsxall") return save(base+".xlsx", xlsxFrom([["Invoice lines",aoaFor(LINE_FIELDS,S.items)],["Product master",aoaFor(MASTER_FIELDS,S.master)],["Invoices",[["Invoice No.","Invoice Date","Supplier","Supplier GSTIN","Buyer","Buyer GSTIN","Lines","Invoice Value","Printed Basic","Printed Discount","Printed Taxable","Printed IGST","Source file"],...Object.values(S.invoices).map(i=>[i.invoiceNo,i.invoiceDate,i.supplier,i.supplierGstin,i.buyer,i.buyerGstin,i.rowCount,i.invoiceValue,i.footer?.basic,i.footer?.disc,i.footer?.taxable,i.footer?.igst,i.sourceFile])]],...(typeof salesSheets==="function"?salesSheets():[])]));
+}
+
+/* ---------- presets ---------- */
+function applyPreset(id){ const p=allPresets().find(p=>p.id===id); if(!p) return;
+  if(p.view==="master"){ S.colsMaster=p.cols.slice(); S.presetMaster=id; } else { S.colsLines=p.cols.slice(); S.presetLines=id; } render(); }
+async function savePreset(name){ const view=S.tab==="master"?"master":"lines"; const cols=view==="master"?S.colsMaster:S.colsLines;
+  const id="p"+Date.now().toString(36); try{ await S.db.doc(`presets/${id}`).set({name,view,cols}); if(view==="master") S.presetMaster=id; else S.presetLines=id; $("presetNote").textContent="Saved."; }
+  catch(e){ $("presetNote").textContent="Couldn't save: "+(e.message||e.code); } }
+
+/* ---------- events ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  S.tab=b.dataset.tab; S.page=0; S.sort=null;
+  $("tab-table").classList.toggle("hidden",!["lines","master"].includes(S.tab));
+  ["pid","sales","analysis","invoices","export"].forEach(t=>$("tab-"+t).classList.toggle("hidden",S.tab!==t));
+  $("fMatch").parentElement.classList.toggle("hidden",S.tab==="master");
+  render();
+});
+["q","fInvoice","fHsn","fExp","fMatch","fDiv","fId","fStock"].forEach(id=>$(id).addEventListener("input",()=>{S.page=0;render();}));
+$("prev").onclick=()=>{S.page--;render();}; $("next").onclick=()=>{S.page++;render();};
+$("tbl").tHead.onclick=e=>{const th=e.target.closest("th"); if(!th||!th.dataset.k) return; const k=th.dataset.k; S.sort = S.sort&&S.sort.k===k ? (S.sort.dir>0?{k,dir:-1}:null) : {k,dir:1}; render();};
+document.addEventListener("click",e=>{ const c=e.target.closest("[data-code]"); if(c){ $("q").value=c.dataset.code; if(S.tab==="analysis"){ document.querySelector('[data-tab="lines"]').click(); } S.page=0; render(); }
+  const d=e.target.closest("[data-del]"); if(d){ const no=d.dataset.del; if(d.dataset.confirm){ d.disabled=true; d.textContent="Deleting…"; removeInvoice(no).then(n=>msg($("globalmsg"),"good",`Deleted invoice ${no}.`+(n?` ${n} PIDs retired.`:""))).catch(err=>{ d.disabled=false; msg($("globalmsg"),"bad","Delete failed: "+(err.message||err.code)); }); } else { const t0=d.textContent; d.dataset.confirm="1"; d.textContent="Click again to delete invoice "+no; setTimeout(()=>{ if(d.isConnected){ delete d.dataset.confirm; d.textContent=t0; } },4000);} }
+  const x=e.target.closest("[data-exp]"); if(x) doExport(x.dataset.exp);
+});
+$("btnCols").onclick=()=>$("colpanel").classList.toggle("open");
+$("colgrid").onchange=e=>{ const k=e.target.dataset.col; const arr=S.tab==="master"?S.colsMaster:S.colsLines; const F=fieldsFor(S.tab==="master"?"master":"lines").map(f=>f[0]);
+  let next = e.target.checked ? [...arr,k] : arr.filter(x=>x!==k); next=F.filter(f=>next.includes(f));
+  if(S.tab==="master"){ S.colsMaster=next; S.presetMaster=""; } else { S.colsLines=next; S.presetLines=""; } render(); };
+$("presetSel").onchange=e=>applyPreset(e.target.value);
+$("btnSavePreset").onclick=()=>{ $("presetNameRow").classList.remove("hidden"); $("presetName").focus(); };
+$("btnPresetCancel").onclick=()=>$("presetNameRow").classList.add("hidden");
+$("btnPresetOk").onclick=async()=>{ const n=$("presetName").value.trim(); if(!n) return; $("presetNameRow").classList.add("hidden"); $("presetName").value=""; await savePreset(n); };
+$("btnUpdPreset").onclick=async()=>{ const id=S.tab==="master"?S.presetMaster:S.presetLines; const p=S.presets.find(p=>p.id===id); if(!p) return; try{ await S.db.doc(`presets/${id}`).set({name:p.name,view:p.view,cols:(p.view==="master"?S.colsMaster:S.colsLines).slice()}); $("presetNote").textContent="Updated."; }catch(e){ $("presetNote").textContent="Couldn't update: "+(e.message||e.code);} };
+$("btnDelPreset").onclick=async()=>{ const id=S.tab==="master"?S.presetMaster:S.presetLines; try{ await S.db.doc(`presets/${id}`).delete(); applyPreset(S.tab==="master"?"_full_master":"_full_lines"); }catch(e){ $("presetNote").textContent="Couldn't delete: "+(e.message||e.code);} };
+$("btnCsv").onclick=()=>save(`${viewName()}_${stamp()}.csv`, csv(tableAoA()));
+$("btnXlsx").onclick=()=>save(`${viewName()}_${stamp()}.xlsx`, xlsxFrom([[S.tab==="master"?"Product master":"Invoice lines", tableAoA()]]));
+$("btnCopy").onclick=async e=>{ const t=tableAoA().map(r=>r.join("\t")).join("\n"); try{ await navigator.clipboard.writeText(t); e.target.textContent="Copied ✓"; }catch{ e.target.textContent="Copy blocked"; } setTimeout(()=>e.target.textContent="Copy",1600); };
+$("btnSeed").onclick=async()=>{ const b=$("btnSeed"); b.disabled=true;
+  try{ const seed=await (await fetch("seed.json")).json();
+    for(const [i,s] of seed.entries()){ b.textContent=`Saving invoice ${i+1} of ${seed.length}…`; await saveInvoice(s,true); }
+    b.textContent="Loaded ✓ — create their PIDs on the PID creation tab"; }
+  catch(e){ b.disabled=false; b.textContent="Load 1,154 lines"; msg($("globalmsg"),"bad","Loading failed: "+(e.message||e.code)); } };
+$("fieldtbl").tBodies[0].innerHTML=LINE_FIELDS.map(f=>`<tr><td>${esc(f[1])}</td><td class="code">${esc(f[0])}</td><td>${esc(f[2])}</td></tr>`).join("");
+
+/* ---------- divisions & PIDs ---------- */
+function regDoc(no){ const g=S.registry[no]||{invoiceNo:no,division:"",lines:{}}; return {invoiceNo:no,division:g.division||"",lines:JSON.parse(JSON.stringify(g.lines||{})),retired:JSON.parse(JSON.stringify(g.retired||[]))}; }
+async function createPids(no, div, rows){
+  if(!div) throw new Error("choose a division");
+  const ref=S.db.doc("settings/counters"); const holder="h"+Math.random().toString(36).slice(2);
+  const lease=await ref.acquire({holder,ttlMs:120000});
+  if(!lease.acquired) throw new Error("PIDs are being created on another device; wait a minute");
+  const fresh=await S.db.doc(`registry/${no}`).get(); const d=regDoc(no);
+  if(fresh.exists){ const fd=fresh.data(); d.division=fd.division||""; d.lines=JSON.parse(JSON.stringify(fd.lines||{})); d.retired=JSON.parse(JSON.stringify(fd.retired||[])); }
+  d.division=div;
+  const pending=[...rows].sort((a,b)=>a.sr-b.sr).filter(r=>!(d.lines[r.sr]&&d.lines[r.sr].id));
+  if(!pending.length){ await S.db.doc(`registry/${no}`).set(d); S.registry[no]=d; return {count:0}; }
+  const snap=await ref.get(); const counters={...((snap.exists&&snap.data().counts)||{})};
+  const taken=new Set(); Object.values(S.registry).forEach(g=>{ Object.values(g.lines||{}).forEach(e=>e.id&&taken.add(e.id)); (g.retired||[]).forEach(e=>e.id&&taken.add(e.id)); });
+  Object.values(d.lines).forEach(e=>e.id&&taken.add(e.id)); (d.retired||[]).forEach(e=>e.id&&taken.add(e.id));
+  const now=new Date().toISOString(); let n=counters[div]||0; const ids=[];
+  for(const r of pending){ let id; do{ n++; id=fmtId(div,n); }while(taken.has(id)); taken.add(id); ids.push(id);
+    d.lines[r.sr]={div,id,mat:r.mat,batch:r.batch,serial:r.serial||"",issuedAt:now}; }
+  counters[div]=n;
+  await ref.set({counts:counters,updatedAt:now});   // reserve numbers first: a failure later leaves gaps, never duplicates
+  S.counters=counters;
+  await S.db.doc(`registry/${no}`).set(d); S.registry[no]=d; rebuild();
+  return {count:ids.length, first:ids[0], last:ids[ids.length-1]};
+}
+document.addEventListener("click",async e=>{ const b=e.target.closest("[data-mkpid]"); if(!b) return; const no=b.dataset.mkpid;
+  const div=document.querySelector(`[data-undiv="${no}"]`).value; const note=document.querySelector(`[data-unnote="${no}"]`);
+  if(!div){ note.textContent="Choose a division first."; return; }
+  b.disabled=true; note.textContent="Creating PIDs…";
+  try{ const rows=S.items.filter(r=>r.invoiceNo===no); const res=await createPids(no,div,rows); msg($("globalmsg"),"good",`Invoice ${no}: created ${inr(res.count,0)} PIDs${res.count?` (${res.first} … ${res.last})`:""}.`); }
+  catch(err){ b.disabled=false; note.textContent="Stopped: "+(err.message||err.code); } });
+$("btnAddDiv").onclick=async()=>{
+  const code=$("newDivCode").value.trim().toUpperCase(), name=$("newDivName").value.trim(); const n=$("divnote");
+  if(!/^[A-Z]{2,5}$/.test(code)){ n.textContent="Code must be 2–5 letters."; return; }
+  if(S.divisions.some(d=>d.code===code)){ n.textContent=code+" already exists."; return; }
+  if(!name){ n.textContent="Enter the division name."; return; }
+  try{ const list=[...S.divisions,{code,name}]; await S.db.doc("settings/divisions").set({list}); S.divisions=list; $("newDivCode").value=""; $("newDivName").value=""; n.textContent="Added "+code+"."; rebuild(); }
+  catch(e){ n.textContent="Couldn't add: "+(e.message||e.code); }
+};
+
+/* ---------- boot ---------- */
+render();
+(async()=>{
+  if(!window.claude||!claude.use){ setStatus("err","Database unavailable outside claude.ai"); S.loaded=true; render(); return; }
+  claude.use("downloads").then(d=>{downloads=d;}).catch(()=>{});
+  claude.use("user").then(async u=>{ try{ const c=u&&u.can?await u.can("data.write"):null; if(c===false){ S.canWrite=false; render(); } }catch{} }).catch(()=>{});
+  const db=await claude.use("db");
+  if(!db){ setStatus("err","Database unavailable. Sign in to claude.ai to use it."); S.loaded=true; render(); return; }
+  S.db=db;
+  let got={inv:false,ch:false}; const timer=setTimeout(()=>{ if(!S.loaded) setStatus("err","Can't reach the database yet. Data may be incomplete."); },10000);
+  const done=(k,meta)=>{ if(!meta.fromCache) got[k]=true; if(got.inv&&got.ch){ clearTimeout(timer); S.loaded=true; setStatus("ok","Saved in database"); } };
+  let t=null; const soon=()=>{ clearTimeout(t); t=setTimeout(rebuild,60); };
+  db.collection("invoices").onSnapshot(s=>{ S.invoices={}; s.docs.forEach(d=>S.invoices[d.id]=d.data()); done("inv",s.metadata); soon(); }, e=>{ setStatus("err","Database error: "+e.message); });
+  db.collection("chunks").onSnapshot(s=>{ S.chunks={}; s.docs.forEach(d=>S.chunks[d.id]=d.data()); done("ch",s.metadata); soon(); }, e=>{ setStatus("err","Database error: "+e.message); });
+  db.collection("registry").onSnapshot(s=>{ S.registry={}; s.docs.forEach(d=>S.registry[d.id]=d.data()); soon(); }, ()=>{});
+  db.doc("settings/divisions").onSnapshot(d=>{ if(d.exists&&Array.isArray(d.data().list)&&d.data().list.length) S.divisions=d.data().list.slice(); soon(); }, ()=>{});
+  db.doc("settings/counters").onSnapshot(d=>{ S.counters=(d.exists&&d.data().counts)||{}; renderIdBar(); }, ()=>{});
+  db.collection("sales").onSnapshot(s=>{ S.sales={}; s.docs.forEach(d=>S.sales[d.id]=d.data()); soon(); }, ()=>{});
+  db.collection("customers").onSnapshot(s=>{ S.customers={}; s.docs.forEach(d=>S.customers[d.id]=d.data()); if(S.tab==="sales") renderSales(); }, ()=>{});
+  db.doc("settings/company").onSnapshot(d=>{ if(d.exists) S.company={...S.company,...d.data()}; }, ()=>{});
+  db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
+})();
+</script>
+<script src="sales.js"></script>
+</body>
+</html>
