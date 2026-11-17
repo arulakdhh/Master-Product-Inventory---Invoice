@@ -43,6 +43,18 @@ nav.subtabs{display:flex;gap:6px;padding:8px 0 10px;flex-wrap:wrap}
 nav.subtabs:empty{display:none}
 nav.subtabs button{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:4px 12px;cursor:pointer;font-size:13px;color:var(--muted)}
 nav.subtabs button[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.chartbox{position:relative;margin-top:10px}
+.chartbox canvas{display:block;width:100%}
+.viztip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:3;min-width:150px}
+.dash-tiles .v.hero{font-variant-numeric:normal;font-size:22px}
+.dash-tiles{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+@media print{
+  header.app,#globalmsg,.no-print,details{display:none!important}
+  main>section:not(#tab-salesdash){display:none!important}
+  body{background:#fff}
+  .panel,.tile{break-inside:avoid;border-color:#ccc}
+  main{padding:0}
+}
 .viewonly{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:var(--warn-soft);color:var(--warn);margin-left:6px}
 main{padding:16px 20px 40px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
 main>*,.grid2>*,main section>*{min-width:0}
@@ -203,6 +215,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
     <div class="panel pad" id="customerBox"></div>
   </section>
   <section id="tab-users" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-salesdash" class="hidden" style="display:grid;gap:14px"></section>
   <section id="tab-noaccess" class="hidden"><div class="panel pad empty" id="noaccessMsg">Checking your access…</div></section>
 
   <section id="tab-analysis" class="hidden" style="display:grid;gap:14px"></section>
@@ -790,6 +803,7 @@ render();
 })();
 </script>
 <script src="sales.js?v=5"></script>
-<script src="ops.js?v=1"></script>
+<script src="ops.js?v=2"></script>
+<script src="analytics.js?v=1"></script>
 </body>
 </html>

@@ -11,11 +11,12 @@ const PANELS = [
   { key: "supply", label: "Supply & Goods", subs: [["supply", "Goods at hospitals"]] },
   { key: "payfollow", label: "Payment Follows", subs: [["payfollow", "Outstanding & follow-ups"]] },
   { key: "payrecv", label: "Payment Received", subs: [["payrecv", "Receipts"]] },
+  { key: "analytics", label: "Sales Analysis", subs: [["salesdash", "Dashboard"]] },
   { key: "company", label: "Company data", subs: [["company", "Company details"], ["customers", "Customers"]] },
   { key: "admin", label: "Admin panel", subs: [["users", "Users & access"], ["export", "Export & backup"]] },
 ];
 const VIEW_SECTIONS = { pid: ["tab-pid", "tab-invoices"], "sales-inv": ["tab-sales"], "sales-dc": ["tab-sales"], "sales-so": ["tab-sales"], lines: ["tab-table"], master: ["tab-table"], analysis: ["tab-analysis"], export: ["tab-export"],
-  po: ["tab-po"], supply: ["tab-supply"], payfollow: ["tab-payfollow"], payrecv: ["tab-payrecv"], company: ["tab-company"], customers: ["tab-customers"], users: ["tab-users"], noaccess: ["tab-noaccess"] };
+  po: ["tab-po"], supply: ["tab-supply"], payfollow: ["tab-payfollow"], payrecv: ["tab-payrecv"], company: ["tab-company"], customers: ["tab-customers"], users: ["tab-users"], salesdash: ["tab-salesdash"], noaccess: ["tab-noaccess"] };
 const ALL_SECTIONS = [...new Set(Object.values(VIEW_SECTIONS).flat())];
 const FIREBASE_MODE = !!(window.FIREBASE_CONFIG && window.firebase);
 Object.assign(S, { me: FIREBASE_MODE ? null : { email: "", name: "Owner", isAdmin: true, local: true, perms: {} }, users: {}, pos: {}, receipts: {}, followups: {}, panel: "invoice", poEd: null, poView: null, rcEd: null, pfOpen: null });
@@ -64,6 +65,7 @@ function renderOps() {
   if (v === "company") { renderCompany(); return true; }
   if (v === "customers") { renderCustomers(); return true; }
   if (v === "users") { renderUsers(); return true; }
+  if (v === "salesdash") { if (typeof renderSalesDash === "function") renderSalesDash(); return true; }
   return false;
 }
 ["tab-company", "tab-customers"].forEach(id => $(id).addEventListener("click", e => salesClick(e)));
@@ -498,7 +500,7 @@ setView(FIREBASE_MODE ? null : "invoice", FIREBASE_MODE ? null : "pid");
     }, () => { S.me = null; S.meState = "none"; setView(null); });
   }
   sub("purchaseOrders", "pos", ["po"]);
-  sub("receipts", "receipts", ["payfollow", "payrecv", "customers"]);
+  sub("receipts", "receipts", ["payfollow", "payrecv", "customers", "salesdash"]);
   sub("followups", "followups", ["payfollow"]);
   const wait = setInterval(() => { if (S.db) { clearInterval(wait); if (S.me) { S.canWrite = canEditPanel(S.panel); render(); } } }, 300);
 })();
