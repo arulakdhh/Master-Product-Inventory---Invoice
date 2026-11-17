@@ -44,10 +44,11 @@ service cloud.firestore {
     }
 
     match /purchaseOrders/{id} { allow read: if canView('po') || canView('invoice'); allow write: if canEdit('po'); }
-    match /receipts/{id}       { allow read: if canView('payrecv') || canView('payfollow') || canView('company') || canView('invoice') || canView('analytics'); allow write: if canEdit('payrecv'); }
+    match /receipts/{id}       { allow read: if canView('payrecv') || canView('payfollow') || canView('company') || canView('invoice') || canView('analytics') || canView('studio'); allow write: if canEdit('payrecv'); }
     match /followups/{id}      { allow read: if canView('payfollow') || canView('payrecv'); allow write: if canEdit('payfollow'); }
     match /customers/{id}      { allow read: if active(); allow write: if canEdit('company') || canEdit('sellorder') || canEdit('invoice') || canEdit('dispatch'); }
     match /presets/{id}        { allow read, write: if active(); }
+    match /reports/{id}        { allow read: if canView('studio'); allow write: if canEdit('studio'); }
     match /locks/{id}          { allow read, write: if active(); }
 
     match /settings/{doc} {

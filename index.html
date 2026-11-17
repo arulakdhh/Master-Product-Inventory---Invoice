@@ -50,11 +50,32 @@ nav.subtabs button[aria-selected="true"]{background:var(--accent-soft);border-co
 .dash-tiles{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 @media print{
   header.app,#globalmsg,.no-print,details{display:none!important}
-  main>section:not(#tab-salesdash){display:none!important}
   body{background:#fff}
   .panel,.tile{break-inside:avoid;border-color:#ccc}
   main{padding:0}
 }
+.stgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.stcard{padding:12px 14px;min-width:0;display:flex;flex-direction:column}
+.stcard.editing{outline:2px solid var(--accent);outline-offset:1px}
+.sthead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.sttitle{font-weight:600}
+.stmore{position:relative;flex:none}
+.stmore>summary{list-style:none;cursor:pointer;padding:0 8px;border-radius:6px;font-size:18px;line-height:24px;color:var(--muted)}
+.stmore>summary::-webkit-details-marker{display:none}
+.stmore>summary:hover,.stmore[open]>summary{background:var(--bg);color:var(--ink)}
+.stmenu{position:absolute;right:0;top:28px;z-index:5;display:grid;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.14);min-width:200px}
+.stmenu .btn{border:0;text-align:left;padding:6px 10px;font-weight:400}
+.stmenu .btn:hover{background:var(--bg)}
+.stcardv{font-size:30px;font-weight:700;margin-top:10px;letter-spacing:-.01em}
+.stlegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:12px;color:var(--muted)}
+.stlegend span{display:inline-flex;align-items:center;gap:5px}
+.stlegend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.stform{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 14px;margin-top:10px}
+.stform label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.stform input[type=text],.stform input[type=number],.stform select{color:var(--ink)}
+.print-only{display:none}
+@media (max-width:900px){.stgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.stcard{grid-column:span 2!important}}
+@media print{.print-only{display:block}.stgrid{grid-template-columns:repeat(6,1fr)}.stmenu{display:none!important}.stcard{break-inside:avoid}}
 .viewonly{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:var(--warn-soft);color:var(--warn);margin-left:6px}
 main{padding:16px 20px 40px;display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
 main>*,.grid2>*,main section>*{min-width:0}
@@ -215,6 +236,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
     <div class="panel pad" id="customerBox"></div>
   </section>
   <section id="tab-users" class="hidden" style="display:grid;gap:14px"></section>
+  <section id="tab-studio" class="hidden" style="display:grid;gap:14px"></section>
   <section id="tab-salesdash" class="hidden" style="display:grid;gap:14px"></section>
   <section id="tab-noaccess" class="hidden"><div class="panel pad empty" id="noaccessMsg">Checking your access…</div></section>
 
@@ -803,7 +825,8 @@ render();
 })();
 </script>
 <script src="sales.js?v=5"></script>
-<script src="ops.js?v=2"></script>
-<script src="analytics.js?v=1"></script>
+<script src="ops.js?v=3"></script>
+<script src="analytics.js?v=2"></script>
+<script src="studio.js?v=1"></script>
 </body>
 </html>

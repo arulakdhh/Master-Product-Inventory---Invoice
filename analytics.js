@@ -323,13 +323,13 @@ function dashPdf(D, G) {
     doc.setFontSize(7.5); doc.setTextColor(...GREY); doc.text(k, x + 3, 30); doc.setFont("FreeSans", "bold"); doc.setFontSize(13); doc.setTextColor(...INK); doc.text(v, x + 3, 37.5); doc.setFont("FreeSans", "normal"); doc.setFontSize(7); doc.setTextColor(...GREY); doc.text(doc.splitTextToSize(n, tw - 6)[0], x + 3, 43); });
   const cv = document.createElement("canvas"); drawMonthly(cv, D, false, { print: true, w: 1100, h: 330 });
   doc.setFont("FreeSans", "bold"); doc.setFontSize(10); doc.setTextColor(...INK); doc.text("Monthly turnover and forecast (₹, excl. GST; lighter columns = forecast with likely range)", M, 54);
-  doc.addImage(cv.toDataURL("image/png"), "PNG", M, 57, W - 2 * M, (W - 2 * M) * 330 / 1100);
+  doc.addImage(cv.toDataURL("image/jpeg", 0.9), "JPEG", M, 57, W - 2 * M, (W - 2 * M) * 330 / 1100);
   let y = 57 + (W - 2 * M) * 330 / 1100 + 6;
   const half = (W - 2 * M - 8) / 2; const cv2 = document.createElement("canvas"); const rows2 = D.byDivision.slice(0, 6); drawRanked(cv2, rows2, null, false, { print: true, w: 640, h: Math.max(80, rows2.length * 34 + 16) });
   const cv3 = document.createElement("canvas"); const rows3 = D.byCustomer.slice(0, 6); drawRanked(cv3, rows3, null, false, { print: true, w: 640, h: Math.max(80, rows3.length * 34 + 16) });
   if (y > 150) { doc.addPage(); head("Sales analysis (continued)"); y = 28; }
   doc.setFont("FreeSans", "bold"); doc.setFontSize(10); doc.text("Turnover by division", M, y); doc.text("Top customers", M + half + 8, y);
-  const h2 = half * cv2.height / cv2.width, h3 = half * cv3.height / cv3.width; doc.addImage(cv2.toDataURL("image/png"), "PNG", M, y + 3, half, h2); doc.addImage(cv3.toDataURL("image/png"), "PNG", M + half + 8, y + 3, half, h3);
+  const h2 = half * cv2.height / cv2.width, h3 = half * cv3.height / cv3.width; doc.addImage(cv2.toDataURL("image/jpeg", 0.9), "JPEG", M, y + 3, half, h2); doc.addImage(cv3.toDataURL("image/jpeg", 0.9), "JPEG", M + half + 8, y + 3, half, h3);
   doc.addPage(); head("Forecast, suggestions and details");
   const st = { font: "FreeSans", fontSize: 8, cellPadding: 1.6, textColor: INK, lineColor: [215, 215, 215], lineWidth: 0.2 }, hs = { font: "FreeSans", fillColor: BLUE, textColor: 255, fontSize: 8 };
   doc.autoTable({ startY: 26, margin: { left: M, right: W / 2 + 4 }, theme: "grid", styles: st, headStyles: hs, head: [["Forecast month", "Expected (₹)", "Likely low", "Likely high"]], body: D.fc.next.map(f => [f.label, inr(f.value, 0), inr(f.low, 0), inr(f.high, 0)]), columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } } });
