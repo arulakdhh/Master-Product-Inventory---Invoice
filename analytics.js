@@ -16,13 +16,14 @@ function dashFacts() {
   for (const [id, d] of Object.entries(S.sales)) {
     if (d.type !== "INV" || d.status === "cancelled") continue;
     (d.lines || []).forEach((l, i) => {
-      const it = itemByKey.get(l.key) || {}; const unitCost = typeof lineCost === "function" ? lineCost(l) : (it.qty ? (it.taxable || 0) / it.qty : 0);
+      const it = itemByKey.get(l.key) || {}; const unitCost = typeof lineNetCost === "function" ? lineNetCost(l, itemByKey) : (it.qty ? (it.taxable || 0) / it.qty : 0);
+      const unitRate = typeof lineCost === "function" ? lineCost(l) : unitCost;
       sales.push({ invId: id, invNo: d.no, date: d.date, month: d.date.slice(0, 7), customerId: d.customerId || d.customer?.name || "", customer: d.customer?.name || "", state: d.customer?.stateCode || "",
         line: i + 1, pid: l.pid || "", mat: l.mat, desc: l.desc, hsn: l.hsn, div: it.divCode || "", qty: l.qty || 0, taxable: l.taxable || 0, gst: r2((l.cgst || 0) + (l.sgst || 0) + (l.igst || 0)), total: l.total || 0,
-        cost: r2(unitCost * (l.qty || 0)), fromDc: !!d.fromDc });
+        cost: r2(unitCost * (l.qty || 0)), costAtRate: r2(unitRate * (l.qty || 0)), fromDc: !!d.fromDc });
     });
   }
-  const purchases = S.items.map(r => { const dt = toDate(r.invoiceDate); return { invoiceNo: r.invoiceNo, date: dt ? mKey(dt) + "-" + String(dt.getDate()).padStart(2, "0") : "", month: dt ? mKey(dt) : "", pid: r.dhhId, mat: r.mat, desc: r.desc, div: r.divCode || "", qty: r.qty, taxable: r.taxable, igst: r.igst, sold: r.soldQty || 0, avail: r.availQty ?? r.qty, exp: r.exp, unitCost: typeof costOfItem === "function" ? costOfItem(r) : (r.qty ? r2(r.taxable / r.qty) : 0), mrp: r.mrp, batch: r.batch, serial: r.serial || "", invoiceDate: r.invoiceDate }; });
+  const purchases = S.items.map(r => { const dt = toDate(r.invoiceDate); return { invoiceNo: r.invoiceNo, date: dt ? mKey(dt) + "-" + String(dt.getDate()).padStart(2, "0") : "", month: dt ? mKey(dt) : "", pid: r.dhhId, mat: r.mat, desc: r.desc, div: r.divCode || "", qty: r.qty, taxable: r.taxable, igst: r.igst, sold: r.soldQty || 0, avail: r.availQty ?? r.qty, exp: r.exp, unitCost: typeof netCostOfItem === "function" ? netCostOfItem(r) : (r.qty ? r2(r.taxable / r.qty) : 0), unitRate: typeof costOfItem === "function" ? costOfItem(r) : (r.qty ? r2((r.basic || r.taxable) / r.qty) : 0), basic: +r.basic || r2((+r.rate || 0) * (r.qty || 0)), disc: +r.disc || 0, supplier: r.supplier || "", mrp: r.mrp, batch: r.batch, serial: r.serial || "", invoiceDate: r.invoiceDate }; });
   const receipts = Object.entries(S.receipts || {}).filter(([, r]) => r.status !== "cancelled").map(([id, r]) => ({ id, no: r.no, date: r.date, month: r.date.slice(0, 7), customerId: r.customerId, customer: r.customer?.name || "", mode: r.mode, amount: r.amount, applied: r2(r.amount - (r.unallocated || 0)) }));
   return { sales, purchases, receipts };
 }
@@ -58,12 +59,28 @@ function dashCompute() {
   const byProduct = rank(sales, "mat", x => x.desc, a => ({ mat: a[0].mat }));
   // stock & receivables (current, not range-bound)
   const stockLines = P0.filter(x => x.avail > 0); const stockValue = r2(stockLines.reduce((a, x) => a + x.avail * x.unitCost, 0));
+  const stockRateValue = r2(stockLines.reduce((a, x) => a + x.avail * x.unitRate, 0));
+  const byPurchase = dashByPurchase(P0);
   const open = (typeof openInvoices === "function" ? openInvoices() : []).filter(x => !div || (x.d.lines || []).some(l => (S.items.find(r => r.key === l.key) || {}).divCode === div));
-  const outstanding = r2(open.reduce((a, x) => a + x.bal, 0)); const today = todayIso();
+  const outstanding = r2(open.reduce((a, x) => a + x.bal, 0)); const openCount = open.length; const today = todayIso();
   const overdue = r2(open.filter(x => x.due < today).reduce((a, x) => a + x.bal, 0));
   let atHosp = 0; for (const d of Object.values(S.sales)) { if (d.type !== "DC" || d.status === "cancelled") continue; for (const l of d.lines || []) { const it = S.items.find(r => r.key === l.key); if (div && (!it || it.divCode !== div)) continue; atHosp += dcPending(l) * (l.rate || l.mrp || 0); } }
   const fc = dashForecast(S0, cur);
-  return { R, months, monthly, T, byCustomer, byDivision, byProduct, stockValue, stockLines, outstanding, overdue, atHosp: r2(atHosp), fc, facts: F, sales, purch, recs, S0, P0 };
+  return { R, months, monthly, T, byCustomer, byDivision, byProduct, stockValue, stockRateValue, byPurchase, openCount, stockLines, outstanding, overdue, atHosp: r2(atHosp), fc, facts: F, sales, purch, recs, S0, P0 };
+}
+/* ---------- stock by purchase invoice: list value, supplier discount, real cost, what is left ---------- */
+function dashByPurchase(P0) {
+  const m = new Map();
+  for (const p of P0) {
+    const k = p.invoiceNo || "—"; let g = m.get(k);
+    if (!g) { g = { invoiceNo: k, date: p.invoiceDate || "", sort: p.date || "", supplier: p.supplier || "", lines: 0, qty: 0, avail: 0, basic: 0, disc: 0, cost: 0, stockCost: 0, soldCost: 0 }; m.set(k, g); }
+    const avail = Math.max(0, p.avail); g.lines++; g.qty += p.qty || 0; g.avail += avail; g.basic += p.basic || 0; g.disc += p.disc || 0; g.cost += p.taxable || 0;
+    g.stockCost += avail * p.unitCost; g.soldCost += ((p.qty || 0) - avail) * p.unitCost;
+  }
+  const rows = [...m.values()].map(g => ({ ...g, basic: r2(g.basic), disc: r2(g.disc), cost: r2(g.cost), stockCost: r2(g.stockCost), soldCost: r2(g.soldCost), discPct: g.basic ? g.disc / g.basic : 0 })).sort((a, b) => (b.sort || "").localeCompare(a.sort || ""));
+  const t = rows.reduce((a, g) => { for (const k of ["lines", "qty", "avail", "basic", "disc", "cost", "stockCost", "soldCost"]) a[k] += g[k]; return a; }, { lines: 0, qty: 0, avail: 0, basic: 0, disc: 0, cost: 0, stockCost: 0, soldCost: 0 });
+  for (const k of ["basic", "disc", "cost", "stockCost", "soldCost"]) t[k] = r2(t[k]); t.discPct = t.basic ? t.disc / t.basic : 0;
+  return { rows, total: t };
 }
 /* ---------- forecast ---------- */
 function dashForecast(salesAll, cur) {
@@ -153,11 +170,13 @@ function renderSalesDash() {
   </div>
   <div class="tiles dash-tiles">
     ${[["Turnover (excl. GST)", "₹ " + lakh(T.turnover), `${T.invoices} invoice${T.invoices === 1 ? "" : "s"} · ${T.customers} customer${T.customers === 1 ? "" : "s"}`],
-      ["Gross margin", "₹ " + lakh(T.margin), `${pct(T.marginPct)} of turnover (vs purchase cost)`],
+      ["Gross margin", "₹ " + lakh(T.margin), `${pct(T.marginPct)} of turnover · vs real cost after supplier discount`],
       ["Invoice value incl. GST", "₹ " + lakh(T.gross), `GST ₹ ${lakh(T.gst)}`],
-      ["Collections", "₹ " + lakh(T.collections), `Outstanding ₹ ${lakh(D.outstanding)}${D.overdue ? ` · overdue ₹ ${lakh(D.overdue)}` : ""}`],
+      ["Amount to receive", "₹ " + lakh(D.outstanding), D.openCount ? `${D.openCount} unpaid invoice${D.openCount === 1 ? "" : "s"} incl. GST${D.overdue ? ` · overdue ₹ ${lakh(D.overdue)}` : " · none overdue"}` : "nothing due · goes up when you issue a tax invoice"],
+      ["Collections", "₹ " + lakh(T.collections), "payments received in this period"],
       ["Purchases", "₹ " + lakh(T.purchases), "supplier invoices in this period"],
-      ["Stock at cost", "₹ " + lakh(D.stockValue), `${D.stockLines.reduce((a, x) => a + x.avail, 0)} units · at hospitals ₹ ${lakh(D.atHosp)}`],
+      ["Stock at cost", "₹ " + lakh(D.stockValue), `${D.stockLines.reduce((a, x) => a + x.avail, 0)} units · after supplier discount, excl. GST · at hospitals ₹ ${lakh(D.atHosp)}`],
+      ["Stock at Rate (list value)", "₹ " + lakh(D.stockRateValue), `reference only · supplier discount ₹ ${lakh(r2(D.stockRateValue - D.stockValue))}`],
       ["Forecast next 3 months", "₹ " + lakh(fcSum), `${esc(D.fc.next.map(x => x.label).join(", "))} · ${esc(D.fc.confidence)} confidence`]].map(([k, v, n]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v hero">${v}</div><div class="note">${n}</div></div>`).join("")}
   </div>
   <div class="panel pad">
@@ -165,6 +184,7 @@ function renderSalesDash() {
     <div class="chartbox"><canvas id="cMonthly" height="300" role="img" aria-label="Monthly turnover with 3-month forecast"></canvas><div class="viztip" id="tipMonthly" hidden></div></div>
     <details class="no-print"><summary class="note">Show as a table</summary>${monthlyTable(D)}</details>
   </div>
+  ${purchaseTable(D)}
   <div class="grid2">
     <div class="panel pad"><h2>Turnover by division</h2><div class="chartbox"><canvas id="cDiv" role="img" aria-label="Turnover by division"></canvas><div class="viztip" id="tipDiv" hidden></div></div></div>
     <div class="panel pad"><h2>Top customers</h2><div class="chartbox"><canvas id="cCust" role="img" aria-label="Top customers by turnover"></canvas><div class="viztip" id="tipCust" hidden></div></div></div>
@@ -179,6 +199,15 @@ function renderSalesDash() {
   ${G.reorder.length ? `<div class="panel pad"><h2>Reorder list</h2><div class="tablewrap" style="max-height:none"><table><thead><tr><th>Material</th><th>Description</th><th class="num">In stock</th><th class="num">Selling / month</th><th class="num">Weeks of stock</th></tr></thead><tbody>${G.reorder.map(x => `<tr><td class="code">${esc(x.mat)}</td><td class="desc">${esc(x.desc)}</td><td class="num">${x.stock}</td><td class="num">${x.perMonth.toFixed(1)}</td><td class="num">${(x.stock / x.perMonth * 4.3).toFixed(1)}</td></tr>`).join("")}</tbody></table></div></div>` : ""}`;
   ensureBound(el, dashEvent);
   requestAnimationFrame(() => { drawMonthly($("cMonthly"), D, true); drawRanked($("cDiv"), D.byDivision.slice(0, 8), "tipDiv", true); drawRanked($("cCust"), D.byCustomer.slice(0, 8), "tipCust", true); });
+}
+function purchaseTable(D) {
+  const B = D.byPurchase; if (!B.rows.length) return "";
+  const pc = v => (v * 100).toFixed(1) + "%";
+  return `<div class="panel pad"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Stock by purchase invoice</h2><span class="note">Each invoice keeps its own supplier discount, so stock is valued at what you actually paid (excl. GST). Rate × Qty is the list value before discount.</span></div>
+  <div class="tablewrap" style="max-height:360px;margin-top:8px"><table><thead><tr><th>Purchase invoice</th><th>Date</th><th>Supplier</th><th class="num">Lines</th><th class="num">Units bought</th><th class="num">In stock</th><th class="num">Rate × Qty (₹)</th><th class="num">Supplier discount (₹)</th><th class="num">Disc %</th><th class="num">Cost excl. GST (₹)</th><th class="num">In stock at cost (₹)</th><th class="num">Sold / out at cost (₹)</th></tr></thead><tbody>
+  ${B.rows.map(g => `<tr><td class="code">${esc(g.invoiceNo)}</td><td>${esc(g.date)}</td><td>${esc(g.supplier)}</td><td class="num">${inr(g.lines, 0)}</td><td class="num">${inr(g.qty, 0)}</td><td class="num">${inr(g.avail, 0)}</td><td class="num">${inr(g.basic)}</td><td class="num">${inr(g.disc)}</td><td class="num">${pc(g.discPct)}</td><td class="num"><b>${inr(g.cost)}</b></td><td class="num"><b>${inr(g.stockCost)}</b></td><td class="num">${inr(g.soldCost)}</td></tr>`).join("")}
+  <tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total</td><td></td><td></td><td class="num">${inr(B.total.lines, 0)}</td><td class="num">${inr(B.total.qty, 0)}</td><td class="num">${inr(B.total.avail, 0)}</td><td class="num">${inr(B.total.basic)}</td><td class="num">${inr(B.total.disc)}</td><td class="num">${pc(B.total.discPct)}</td><td class="num">${inr(B.total.cost)}</td><td class="num">${inr(B.total.stockCost)}</td><td class="num">${inr(B.total.soldCost)}</td></tr>
+  </tbody></table></div><p class="note">Check: cost ₹ ${inr(B.total.cost)} = in stock ₹ ${inr(B.total.stockCost)} + sold / out ₹ ${inr(B.total.soldCost)}.</p></div>`;
 }
 function monthlyTable(D) {
   return `<div class="tablewrap" style="max-height:none"><table><thead><tr><th>Month</th><th class="num">Invoices</th><th class="num">Turnover</th><th class="num">GST</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">Margin %</th><th class="num">Purchases</th><th class="num">Collections</th></tr></thead><tbody>
@@ -266,8 +295,9 @@ function dashExcel(D, G) {
   const sum = [["Sales analysis", D.R.label + (S.dash.div ? " · " + divName(S.dash.div) : " · all divisions")], ["Generated", new Date().toLocaleString("en-IN")], [], ["Measure", "Value"],
     ["Turnover excl. GST (₹)", T.turnover], ["GST (₹)", T.gst], ["Invoice value incl. GST (₹)", T.gross], ["Cost of goods sold (₹)", T.cost], ["Gross margin (₹)", T.margin], ["Gross margin %", p(T.marginPct)],
     ["Invoices", T.invoices], ["Customers", T.customers], ["Units sold", T.qty], ["Average invoice (₹)", r2(T.avgInvoice)], ["Purchases (₹)", T.purchases], ["Collections (₹)", T.collections],
-    ["Outstanding now (₹)", D.outstanding], ["Overdue now (₹)", D.overdue], ["Stock at cost now (₹)", D.stockValue], ["Goods at hospitals now (₹)", D.atHosp], [], ["Forecast method", D.fc.method], ["Confidence", D.fc.confidence], ["Note", D.fc.note]];
+    ["Amount to receive now (₹)", D.outstanding], ["Unpaid invoices now", D.openCount], ["Overdue now (₹)", D.overdue], ["Stock at cost now, after supplier discount (₹)", D.stockValue], ["Stock at Rate now, list value (₹)", D.stockRateValue], ["Supplier discount in stock (₹)", r2(D.stockRateValue - D.stockValue)], ["Goods at hospitals now (₹)", D.atHosp], [], ["Forecast method", D.fc.method], ["Confidence", D.fc.confidence], ["Note", D.fc.note]];
   XLSX.utils.book_append_sheet(wb, sheetFrom(sum, [34, 60]), "Summary");
+  XLSX.utils.book_append_sheet(wb, sheetFrom([["Purchase invoice", "Date", "Supplier", "Lines", "Units bought", "Units in stock", "Rate × Qty (₹)", "Supplier discount (₹)", "Discount %", "Cost excl. GST (₹)", "In stock at cost (₹)", "Sold / out at cost (₹)"], ...D.byPurchase.rows.map(g => [g.invoiceNo, g.date, g.supplier, g.lines, g.qty, g.avail, g.basic, g.disc, p(g.discPct), g.cost, g.stockCost, g.soldCost]), ["Total", "", "", D.byPurchase.total.lines, D.byPurchase.total.qty, D.byPurchase.total.avail, D.byPurchase.total.basic, D.byPurchase.total.disc, p(D.byPurchase.total.discPct), D.byPurchase.total.cost, D.byPurchase.total.stockCost, D.byPurchase.total.soldCost]], [18, 12, 30, 7, 11, 11, 15, 16, 10, 16, 16, 16]), "Stock by purchase");
   XLSX.utils.book_append_sheet(wb, sheetFrom([["Month", "Invoices", "Units", "Turnover (₹)", "GST (₹)", "Total incl. GST (₹)", "Cost (₹)", "Margin (₹)", "Margin %", "Purchases (₹)", "Collections (₹)"], ...D.monthly.map(m => [m.label, m.invoices, m.qty, m.turnover, m.gst, m.gross, m.cost, m.margin, p(m.marginPct), m.purchases, m.collections])]), "Monthly");
   XLSX.utils.book_append_sheet(wb, sheetFrom([["Month", "Type", "Turnover (₹)", "Likely low (₹)", "Likely high (₹)"], ...D.fc.history.map(h => [mLabel(h.month), h.partial ? "Actual (month so far, projected to month end)" : "Actual", h.partial ? h.value : h.actual, "", ""]), ...D.fc.next.map(f => [f.label, "Forecast", f.value, f.low, f.high]), [], ["Method", D.fc.method], ["Confidence", D.fc.confidence]], [14, 44, 16, 16, 16]), "Forecast");
   const rk = (rows, first) => [[first, "Turnover (₹)", "Share %", "Cost (₹)", "Margin (₹)", "Margin %", "Units", "Invoices"], ...rows.map(r => [r.name, r.turnover, r2(r.share * 100), r.cost, r.margin, p(r.marginPct), r.qty, r.invoices])];
@@ -318,7 +348,7 @@ function dashPdf(D, G) {
   const head = (title) => { if (co.logo) { try { doc.addImage(co.logo, "PNG", M, 8, 12, 12); } catch (e) { } } doc.setFont("FreeSans", "bold"); doc.setFontSize(14); doc.setTextColor(...INK); doc.text(title, M + 15, 14);
     doc.setFont("FreeSans", "normal"); doc.setFontSize(8.5); doc.setTextColor(...GREY); doc.text(`${co.name} · ${D.R.label}${S.dash.div ? " · " + divName(S.dash.div) : " · all divisions"} · generated ${new Date().toLocaleString("en-IN")}`, M + 15, 19); };
   head("Sales analysis");
-  const tiles = [["Turnover (excl. GST)", "₹ " + lakh(T.turnover), `${T.invoices} invoices · ${T.customers} customers`], ["Gross margin", "₹ " + lakh(T.margin), pct(T.marginPct) + " of turnover"], ["Incl. GST", "₹ " + lakh(T.gross), "GST ₹ " + lakh(T.gst)], ["Collections", "₹ " + lakh(T.collections), "Outstanding ₹ " + lakh(D.outstanding)], ["Stock at cost", "₹ " + lakh(D.stockValue), "At hospitals ₹ " + lakh(D.atHosp)], ["Forecast 3 months", "₹ " + lakh(D.fc.next.reduce((a, x) => a + x.value, 0)), D.fc.confidence + " confidence"]];
+  const tiles = [["Turnover (excl. GST)", "₹ " + lakh(T.turnover), `${T.invoices} invoices · ${T.customers} customers`], ["Gross margin", "₹ " + lakh(T.margin), pct(T.marginPct) + " of turnover"], ["Incl. GST", "₹ " + lakh(T.gross), "GST ₹ " + lakh(T.gst)], ["Amount to receive", "₹ " + lakh(D.outstanding), `${D.openCount} unpaid · collected ₹ ${lakh(T.collections)}`], ["Stock at cost", "₹ " + lakh(D.stockValue), "At hospitals ₹ " + lakh(D.atHosp)], ["Forecast 3 months", "₹ " + lakh(D.fc.next.reduce((a, x) => a + x.value, 0)), D.fc.confidence + " confidence"]];
   const tw = (W - 2 * M - 5 * 4) / 6; tiles.forEach(([k, v, n], i) => { const x = M + i * (tw + 4); doc.setDrawColor(220); doc.setFillColor(248, 248, 247); doc.roundedRect(x, 25, tw, 22, 2, 2, "FD");
     doc.setFontSize(7.5); doc.setTextColor(...GREY); doc.text(k, x + 3, 30); doc.setFont("FreeSans", "bold"); doc.setFontSize(13); doc.setTextColor(...INK); doc.text(v, x + 3, 37.5); doc.setFont("FreeSans", "normal"); doc.setFontSize(7); doc.setTextColor(...GREY); doc.text(doc.splitTextToSize(n, tw - 6)[0], x + 3, 43); });
   const cv = document.createElement("canvas"); drawMonthly(cv, D, false, { print: true, w: 1100, h: 330 });
