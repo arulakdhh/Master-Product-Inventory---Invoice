@@ -75,11 +75,11 @@ const isIntra = c => { const s = custState(c); return !s || s === (S.company.sta
 /* ---------- editor ---------- */
 function newDoc(type, from) {
   const vu = new Date(); vu.setDate(vu.getDate() + 30);
-  S.ed = { opts: { hospOn: false, hospPct: "", surgOn: false, surgPct: "", gstOn: false, gstPct: "" }, validUntil: type === "QTN" ? vu.toISOString().slice(0, 10) : "", yourRef: "", preparedBy: "", type, date: todayIso(), customerId: "", cust: { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }, extra: [{ label: "", value: "" }], lines: [], notes: "", refQtn: "", refDc: "", fromDc: false, editingId: "", creditDays: 30 };
+  S.ed = { opts: { hospOn: false, hospPct: "", surgOn: false, surgPct: "", gstOn: false, gstPct: "" }, validUntil: type === "QTN" ? vu.toISOString().slice(0, 10) : "", yourRef: "", preparedBy: "", type, date: todayIso(), customerId: "", cust: { name: "", address: "", gstin: "", stateCode: "33", dl: "", phone: "" }, extra: [{ label: "", value: "" }], lines: [], notes: "", refQtn: "", refDc: "", fromDc: false, editingId: "", creditDays: 30, case: { procedure: "", surgeon: "", patient: "" } };
   if (from) {
     const src = S.sales[from];
     S.ed.cust = { ...src.customer }; S.ed.customerId = src.customerId || ""; S.ed.extra = (src.extra || []).map(x => ({ ...x })); if (!S.ed.extra.length) S.ed.extra = [{ label: "", value: "" }];
-    S.ed.lines = src.lines.map(l => ({ ...l })); S.ed.notes = src.notes || ""; S.ed.opts = { ...S.ed.opts, ...(src.opts || {}) }; if (!("gstOn" in (src.opts || {}))) { const g = (src.lines[0] || {}).gstRate || 0; S.ed.opts.gstOn = g > 0; S.ed.opts.gstPct = g || ""; } S.ed.yourRef = src.yourRef || ""; S.ed.preparedBy = src.preparedBy || "";
+    S.ed.lines = src.lines.map(l => ({ ...l })); S.ed.notes = src.notes || ""; S.ed.opts = { ...S.ed.opts, ...(src.opts || {}) }; if (!("gstOn" in (src.opts || {}))) { const g = (src.lines[0] || {}).gstRate || 0; S.ed.opts.gstOn = g > 0; S.ed.opts.gstPct = g || ""; } S.ed.yourRef = src.yourRef || ""; S.ed.preparedBy = src.preparedBy || ""; S.ed.case = { procedure: "", surgeon: "", patient: "", ...(src.case || {}) };
     if (isOrderType(src.type)) S.ed.refQtn = from;
     if (src.type === "DC") { S.ed.refDc = from; S.ed.fromDc = true; S.ed.lines = src.lines.map((l, i) => ({ ...l, dcIdx: i, dcPending: dcPending(l), qty: dcPending(l) })).filter(l => l.dcPending > 0); }
     if (type === "INV") { const c = S.customers[S.ed.customerId]; S.ed.creditDays = c && c.creditDays != null ? c.creditDays : 30; }
@@ -88,7 +88,7 @@ function newDoc(type, from) {
 }
 function editQuotation(id) {
   const src = S.sales[id]; newDoc(src.type, null);
-  Object.assign(S.ed, { opts: { ...S.ed.opts, ...(src.opts || {}), ...(("gstOn" in (src.opts || {})) ? {} : { gstOn: ((src.lines[0] || {}).gstRate || 0) > 0, gstPct: (src.lines[0] || {}).gstRate || "" }) }, validUntil: src.validUntil || "", yourRef: src.yourRef || "", preparedBy: src.preparedBy || "", editingId: id, date: src.date, cust: { ...src.customer }, customerId: src.customerId || "", extra: (src.extra || []).map(x => ({ ...x })), lines: src.lines.map(l => ({ ...l })), notes: src.notes || "" });
+  Object.assign(S.ed, { opts: { ...S.ed.opts, ...(src.opts || {}), ...(("gstOn" in (src.opts || {})) ? {} : { gstOn: ((src.lines[0] || {}).gstRate || 0) > 0, gstPct: (src.lines[0] || {}).gstRate || "" }) }, validUntil: src.validUntil || "", yourRef: src.yourRef || "", preparedBy: src.preparedBy || "", editingId: id, date: src.date, cust: { ...src.customer }, customerId: src.customerId || "", extra: (src.extra || []).map(x => ({ ...x })), lines: src.lines.map(l => ({ ...l })), notes: src.notes || "", case: { procedure: "", surgeon: "", patient: "", ...(src.case || {}) } });
   if (!S.ed.extra.length) S.ed.extra = [{ label: "", value: "" }];
   renderSales();
 }
@@ -97,7 +97,7 @@ function availFor(key) { const r = stockFor(key); if (!r) return 0; const m = so
 function addLine(key) {
   const r = stockFor(key); if (!r) return;
   if (S.ed.lines.some(l => l.key === key)) { edMsg("That PID is already on this document. Change its quantity instead."); return; }
-  S.ed.lines.push({ key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, mat: r.mat, desc: r.desc, hsn: r.hsn, batch: r.batch, serial: r.serial || "", exp: r.exp, uom: r.uom, qty: 1, mrp: r.mrp, rate: r.mrp, discPct: 0, gstRate: r.igstRate || 0, remarks: "" });
+  S.ed.lines.push({ key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, mat: r.mat, desc: r.desc, hsn: r.hsn, batch: r.batch, serial: r.serial || "", exp: r.exp, uom: r.uom, qty: 1, mrp: r.mrp, rate: S.ed.type === "PO" ? r.mrp : (S.ed.pctAll > 0 && costOfItem(r) ? r2(costOfItem(r) * S.ed.pctAll / 100) : 0), cost: typeof costOfItem === "function" ? costOfItem(r) : 0, sellPct: S.ed.type !== "PO" && S.ed.pctAll > 0 && costOfItem(r) ? +S.ed.pctAll : "", discPct: 0, gstRate: r.igstRate || 0, remarks: "" });
   renderEditor();
 }
 function edMsg(t, kind = "warn") { const el = document.getElementById("edMsg"); if (el) { el.className = "msg " + kind; el.textContent = t; el.classList.remove("hidden"); } }
@@ -184,6 +184,10 @@ function renderEditor() {
      <div style="display:grid;gap:8px;align-content:start">
        <div class="row"><label for="edDate"><b>Date</b></label><input type="date" id="edDate" value="${esc(E.date)}">${E.type === "QTN" ? `<label for="edValid"><b>Valid until</b></label><input type="date" id="edValid" value="${esc(E.validUntil)}">` : ""}</div>
        <div class="row">${E.type === "INV" ? `<label for="edCredit">Credit days</label><input type="number" min="0" step="1" id="edCredit" value="${esc(E.creditDays ?? 30)}" style="width:70px">` : ""}<label for="edRef">Your ref. / enquiry no.</label><input type="text" id="edRef" value="${esc(E.yourRef)}" style="width:150px"><label for="edPrep">Prepared by</label><input type="text" id="edPrep" value="${esc(E.preparedBy)}" placeholder="Name, designation" style="width:170px"></div>
+       ${E.type !== "PO" ? (() => { const C = E.case || {}; const past = k => [...new Set(Object.values(S.sales || {}).map(d => d.case && d.case[k]).filter(Boolean))].sort();
+         return `<div style="display:grid;gap:6px;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:8px 10px"><div><b>Procedure record</b> <span class="note">for your profit analysis, not printed</span></div>
+         <div class="row" style="gap:6px"><input type="text" id="edProc" list="dlProc" value="${esc(C.procedure || "")}" placeholder="Procedure / case, e.g. TKR, ORIF distal radius" style="flex:1;min-width:200px" aria-label="Procedure or case"><input type="text" id="edSurg" list="dlSurg" value="${esc(C.surgeon || "")}" placeholder="Surgeon" style="width:160px" aria-label="Surgeon"><input type="text" id="edPat" value="${esc(C.patient || "")}" placeholder="Patient / IP no." style="width:150px" aria-label="Patient or IP number"></div>
+         <datalist id="dlProc">${past("procedure").map(x => `<option value="${esc(x)}">`).join("")}</datalist><datalist id="dlSurg">${past("surgeon").map(x => `<option value="${esc(x)}">`).join("")}</datalist></div>`; })() : ""}
        <div class="row"><label for="edCust"><b>Customer</b></label><select id="edCust"><option value="">— new customer —</option>${custOpts}</select></div>
        <div class="kvform">
          <label for="cName">Name</label><input type="text" id="cName" data-c="name" value="${esc(E.cust.name)}">
@@ -215,21 +219,28 @@ function renderEditor() {
      <input type="search" id="pick" placeholder="e.g. MHC12, MT-PS73, LUSC-35, K2512…" autocomplete="off">
      <div id="pickres"></div>
    </div>`}
+   ${E.type !== "PO" && typeof lineCost === "function" ? `<div class="row" style="margin-top:10px;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+     <b>Sell % for this ${esc((T.short || T.name).toLowerCase())}</b><input type="number" id="edPctAll" min="0" step="0.01" value="${E.pctAll || ""}" placeholder="e.g. 200" style="width:90px" aria-label="Selling percent for all lines"><span>% of purchase rate</span>
+     <button class="btn" id="edPctApply" ${E.lines.length ? "" : "disabled"}>Apply to all lines</button><span class="note">or type a different % (or selling rate) on any line. Not printed.</span></div>` : ""}
    <div class="tablewrap" style="margin-top:10px;max-height:none"><table class="edtable">
-     <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th><th class="num">Rate</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
+     <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th>${E.type !== "PO" ? `<th class="num" title="Your purchase rate from the supplier invoice (not printed)">Purchase rate</th><th class="num" title="Selling price as % of the purchase rate">Sell %</th>` : ""}<th class="num">${E.type !== "PO" ? "Selling rate" : "Rate"}</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
      <tbody>${E.lines.length ? E.lines.map((l, i) => { const c = calcLine(l, intra, O); const av = availFor(l.key); const over = T.deducts && !E.fromDc && l.qty > av;
        return `<tr><td>${i + 1}</td><td class="dhh">${esc(l.pid)}</td><td class="desc">${esc(l.desc)}<div class="note">${esc(l.mat)} · HSN ${esc(l.hsn)}</div></td><td class="code">${esc(l.batch)}${l.serial ? "<br>" + esc(l.serial) : ""}</td><td>${esc(l.exp)}</td><td class="num">${E.fromDc ? inr(l.dcPending, 0) : inr(av, 0)}</td>
        <td class="num"><input type="number" min="1" step="1" data-l="qty" data-i="${i}" value="${l.qty}" style="width:64px;text-align:right;${over ? "border-color:var(--bad)" : ""}" ${l.serial ? "readonly" : ""} aria-label="Quantity line ${i + 1}"></td>
        <td class="num">${inr(l.mrp)}</td>
+       ${E.type !== "PO" ? (() => { const uc = typeof lineCost === "function" ? lineCost(l) : 0; const sp = uc ? r2(l.rate / uc * 100) : 0;
+         return `<td class="num" style="background:var(--bg)">${uc ? inr(uc) : `<span class="note neg">no rate</span>`}</td><td class="num"><input type="number" min="0" step="0.01" data-l="sellPct" data-i="${i}" value="${uc && l.rate > 0 ? sp : ""}" placeholder="%" ${uc ? "" : "disabled"} style="width:70px;text-align:right;${!(l.rate > 0) ? "border-color:var(--warn,#d08700)" : ""}" aria-label="Selling percent line ${i + 1}">${l.rate > 0 ? `<div class="note">profit ${inr(r2(c.taxable - uc * l.qty))}</div>` : `<div class="note">enter %</div>`}</td>`; })() : ""}
        <td class="num"><input type="number" min="0" step="0.01" data-l="rate" data-i="${i}" value="${l.rate}" style="width:96px;text-align:right" aria-label="Rate line ${i + 1}"></td>
        <td class="num"><input type="number" min="0" max="100" step="0.01" data-l="discPct" data-i="${i}" value="${l.discPct}" style="width:64px;text-align:right" aria-label="Discount line ${i + 1}"></td>
        <td class="num">${inr(c.gstRate)}</td>
        <td class="num">${inr(c.amount)}</td><td class="num">${inr(c.total)}</td>
        <td><input type="text" data-l="remarks" data-i="${i}" value="${esc(l.remarks)}" style="width:130px" aria-label="Remarks line ${i + 1}"></td>
-       <td><button class="btn" data-ldel="${i}" aria-label="Remove line">✕</button></td></tr>`; }).join("") : `<tr><td colspan="15" class="empty">No products yet. Search above to add.</td></tr>`}</tbody>
+       <td><button class="btn" data-ldel="${i}" aria-label="Remove line">✕</button></td></tr>`; }).join("") : `<tr><td colspan="17" class="empty">No products yet. Search above to add.</td></tr>`}</tbody>
    </table></div>
    <div class="row" style="justify-content:space-between;margin-top:10px;align-items:flex-start">
      <div id="edMsg" class="hidden"></div>
+     ${typeof lineProfit === "function" && E.type !== "PO" && E.lines.length ? (() => { const pp = E.lines.map(l => lineProfit(l, intra, O)); const sv = r2(pp.reduce((a, x) => a + x.sale, 0)), cv = r2(pp.reduce((a, x) => a + x.cost, 0)), pv = r2(sv - cv);
+       return `<dl class="kv" style="margin-left:auto;text-align:right;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:8px 12px" title="For you only, never printed"><dt><b>Profit on this ${esc(T.short || T.name).toLowerCase()}</b></dt><dd class="note">not printed</dd><dt>Sale value (excl. GST)</dt><dd>${inr(sv)}</dd><dt>Purchase cost (Rate × qty)</dt><dd>− ${inr(cv)}</dd><dt><b>Profit</b></dt><dd><b class="${pv >= 0 ? "pos" : "neg"}">₹ ${inr(pv)}</b></dd><dt>Margin · sold at</dt><dd>${sv ? (pv / sv * 100).toFixed(1) + "%" : "—"} · ${cv ? inr(sv / cv * 100, 0) + "% of Rate" : "—"}</dd></dl>`; })() : ""}
      <dl class="kv" style="margin-left:auto;text-align:right">
        <dt>Gross value</dt><dd class="num">${inr(tot.amount)}</dd>
        ${O.hospOn ? `<dt>Less: Hospital discount ${inr(O.hospPct)}%</dt><dd>− ${inr(tot.hospDisc)}</dd>` : ""}${O.surgOn ? `<dt>Less: Surgeon discount ${inr(O.surgPct)}%</dt><dd>− ${inr(tot.surgDisc)}</dd>` : ""}
@@ -265,8 +276,11 @@ function salesInput(e) {
   if (t.id === "edRef") { E.yourRef = t.value; return; }
   if (t.id === "edCredit") { E.creditDays = t.value === "" ? "" : Math.max(0, Math.round(+t.value || 0)); return; }
   if (t.id === "edPrep") { E.preparedBy = t.value; return; }
+  if (t.id === "edPctAll") { E.pctAll = t.value === "" ? "" : Math.max(0, parseFloat(t.value) || 0); return; }
+  if (t.id === "edProc" || t.id === "edSurg" || t.id === "edPat") { E.case = E.case || {}; E.case[{ edProc: "procedure", edSurg: "surgeon", edPat: "patient" }[t.id]] = t.value; return; }
   if (t.dataset.o && t.type === "number") { E.opts[t.dataset.o] = t.value === "" ? "" : (parseFloat(t.value) || 0); return; }
-  if (t.dataset.l) { const l = E.lines[+t.dataset.i]; const k = t.dataset.l; l[k] = k === "remarks" ? t.value : (parseFloat(t.value) || 0); if (k === "qty") l.qty = Math.max(0, Math.round(l.qty)); }
+  if (t.dataset.l) { const l = E.lines[+t.dataset.i]; const k = t.dataset.l; l[k] = k === "remarks" ? t.value : (parseFloat(t.value) || 0); if (k === "qty") l.qty = Math.max(0, Math.round(l.qty));
+    if (typeof lineCost === "function" && (k === "sellPct" || k === "rate")) { const uc = lineCost(l); if (k === "sellPct") { if (t.value === "") { l.sellPct = ""; l.rate = 0; } else if (uc) l.rate = r2(uc * l.sellPct / 100); } else l.sellPct = uc ? r2(l.rate / uc * 100) : 0; } }
 }
 function salesChange(e) {
   const t = e.target; const E = S.ed;
@@ -287,6 +301,7 @@ async function salesClick(e) {
   if (b.id === "xAdd") { E.extra.push({ label: "", value: "" }); return renderEditor(); }
   if (b.dataset.xdel) { E.extra.splice(+b.dataset.xdel, 1); if (!E.extra.length) E.extra.push({ label: "", value: "" }); return renderEditor(); }
   if (b.id === "edCancel") { S.ed = null; S._pickq = ""; return renderEditor(); }
+  if (b.id === "edPctApply") { const p = +E.pctAll; if (!(p > 0)) { edMsg("Enter the sell % first, e.g. 200.", "bad"); return; } for (const l of E.lines) { const uc = lineCost(l); if (uc) { l.sellPct = p; l.rate = r2(uc * p / 100); } } return renderEditor(); }
   if (b.id === "edSave") return saveDoc(b);
   if (b.dataset.view) { S.salesView = b.dataset.view; return renderDocView(b.dataset.view, true); }
   if (b.dataset.editq) return editQuotation(b.dataset.editq);
@@ -318,6 +333,7 @@ async function saveDoc(btn) {
   if (E.opts.hospOn && !(+E.opts.hospPct > 0)) return edMsg("Hospital discount is ticked: enter the %, or untick it.", "bad");
   if (E.opts.surgOn && !(+E.opts.surgPct > 0)) return edMsg("Surgeon discount is ticked: enter the %, or untick it.", "bad");
   if (E.lines.some(l => !(l.qty > 0))) return edMsg("Every line needs a quantity of at least 1.", "bad");
+  if (E.type !== "PO") { const np = E.lines.map((l, i) => !(+l.rate > 0) ? (l.pid || "line " + (i + 1)) : null).filter(Boolean); if (np.length) return edMsg(`Enter the sell % (or selling rate) for ${np.join(", ")}.`, "bad"); }
   if (E.lines.some(l => l.serial && l.qty > 1)) return edMsg("A serial-numbered implant can only have quantity 1.", "bad");
   if (E.cust.gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(E.cust.gstin.trim().toUpperCase())) return edMsg("The GSTIN doesn't look right (15 characters, e.g. 33AAICD8859P1ZS). Fix it or leave it blank.", "bad");
   if (T.deducts && !E.fromDc) {
@@ -333,9 +349,10 @@ async function saveDoc(btn) {
     const cust = { ...E.cust, gstin: (E.cust.gstin || "").trim().toUpperCase(), stateCode: custState(E.cust) || "33" }; cust.stateName = STATES[cust.stateCode] || "";
     let customerId = E.customerId;
     if (!customerId) { customerId = "c" + Date.now().toString(36); await S.db.doc(`customers/${customerId}`).set({ name: cust.name, address: cust.address, gstin: cust.gstin, stateCode: cust.stateCode, stateName: cust.stateName, dl: cust.dl, phone: cust.phone }); }
-    const lines = E.lines.map(l => { const c = calcLine(l, intra, opts); return { ...l, ...c }; });
+    const lines = E.lines.map(l => { const c = calcLine(l, intra, opts); const uc = typeof lineCost === "function" ? lineCost(l) : 0; const cv = r2(uc * (l.qty || 0));
+      return { ...l, ...c, ...(E.type !== "PO" ? { cost: uc, sellPct: uc ? r2(l.rate / uc * 100) : 0, costValue: cv, profit: r2(c.taxable - cv) } : {}) }; });
     const dueDate = E.type === "INV" ? (() => { const d = new Date(E.date); d.setDate(d.getDate() + (+E.creditDays || 0)); return d.toISOString().slice(0, 10); })() : "";
-    const base = { dueDate, creditDays: E.type === "INV" ? (+E.creditDays || 0) : null, opts, validUntil: E.validUntil || "", yourRef: E.yourRef || "", preparedBy: E.preparedBy || "", type: E.type, date: E.date, customerId, customer: cust, intra, extra: E.extra.filter(x => x.label.trim() || x.value.trim()), notes: E.notes, lines, totals, company: { ...S.company } };
+    const base = { dueDate, creditDays: E.type === "INV" ? (+E.creditDays || 0) : null, opts, validUntil: E.validUntil || "", yourRef: E.yourRef || "", preparedBy: E.preparedBy || "", type: E.type, date: E.date, customerId, customer: cust, intra, extra: E.extra.filter(x => x.label.trim() || x.value.trim()), notes: E.notes, lines, totals, company: { ...S.company }, case: E.type !== "PO" ? { procedure: (E.case?.procedure || "").trim(), surgeon: (E.case?.surgeon || "").trim(), patient: (E.case?.patient || "").trim() } : null };
     let id, no;
     if (E.editingId) { id = E.editingId; const old = S.sales[id]; no = old.no; await S.db.doc(`sales/${id}`).set({ ...old, ...base, no, updatedAt: new Date().toISOString() }); }
     else {

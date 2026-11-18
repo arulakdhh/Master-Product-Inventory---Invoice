@@ -16,13 +16,13 @@ function dashFacts() {
   for (const [id, d] of Object.entries(S.sales)) {
     if (d.type !== "INV" || d.status === "cancelled") continue;
     (d.lines || []).forEach((l, i) => {
-      const it = itemByKey.get(l.key) || {}; const unitCost = it.qty ? (it.taxable || 0) / it.qty : 0;
+      const it = itemByKey.get(l.key) || {}; const unitCost = typeof lineCost === "function" ? lineCost(l) : (it.qty ? (it.taxable || 0) / it.qty : 0);
       sales.push({ invId: id, invNo: d.no, date: d.date, month: d.date.slice(0, 7), customerId: d.customerId || d.customer?.name || "", customer: d.customer?.name || "", state: d.customer?.stateCode || "",
         line: i + 1, pid: l.pid || "", mat: l.mat, desc: l.desc, hsn: l.hsn, div: it.divCode || "", qty: l.qty || 0, taxable: l.taxable || 0, gst: r2((l.cgst || 0) + (l.sgst || 0) + (l.igst || 0)), total: l.total || 0,
         cost: r2(unitCost * (l.qty || 0)), fromDc: !!d.fromDc });
     });
   }
-  const purchases = S.items.map(r => { const dt = toDate(r.invoiceDate); return { invoiceNo: r.invoiceNo, date: dt ? mKey(dt) + "-" + String(dt.getDate()).padStart(2, "0") : "", month: dt ? mKey(dt) : "", pid: r.dhhId, mat: r.mat, desc: r.desc, div: r.divCode || "", qty: r.qty, taxable: r.taxable, igst: r.igst, sold: r.soldQty || 0, avail: r.availQty ?? r.qty, exp: r.exp, unitCost: r.qty ? r2(r.taxable / r.qty) : 0, mrp: r.mrp, batch: r.batch, serial: r.serial || "", invoiceDate: r.invoiceDate }; });
+  const purchases = S.items.map(r => { const dt = toDate(r.invoiceDate); return { invoiceNo: r.invoiceNo, date: dt ? mKey(dt) + "-" + String(dt.getDate()).padStart(2, "0") : "", month: dt ? mKey(dt) : "", pid: r.dhhId, mat: r.mat, desc: r.desc, div: r.divCode || "", qty: r.qty, taxable: r.taxable, igst: r.igst, sold: r.soldQty || 0, avail: r.availQty ?? r.qty, exp: r.exp, unitCost: typeof costOfItem === "function" ? costOfItem(r) : (r.qty ? r2(r.taxable / r.qty) : 0), mrp: r.mrp, batch: r.batch, serial: r.serial || "", invoiceDate: r.invoiceDate }; });
   const receipts = Object.entries(S.receipts || {}).filter(([, r]) => r.status !== "cancelled").map(([id, r]) => ({ id, no: r.no, date: r.date, month: r.date.slice(0, 7), customerId: r.customerId, customer: r.customer?.name || "", mode: r.mode, amount: r.amount, applied: r2(r.amount - (r.unallocated || 0)) }));
   return { sales, purchases, receipts };
 }
