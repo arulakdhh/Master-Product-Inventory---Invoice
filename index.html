@@ -276,6 +276,16 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
       </div>
       <div id="bkmsg" style="margin-top:10px"></div>
     </div>
+    <div class="panel pad" id="clearBox" style="border-color:var(--bad)">
+      <h2 style="color:var(--bad)">Clear data</h2>
+      <p class="note">Permanently removes data from the register. A full backup is downloaded first; if the download doesn't complete, nothing is deleted. Users and access are always kept, so you can't lock yourself out.</p>
+      <div style="display:grid;gap:6px">
+        <label class="chk"><input type="radio" name="clearScope" value="all" checked> <span><b>Everything</b>: supplier invoices and PIDs, sales documents, challans, receipts, follow-ups, purchase orders, customers, company details, divisions, saved reports and column sets. All numbering restarts (MLS01, DHH/26-27/0001 …).</span></label>
+        <label class="chk"><input type="radio" name="clearScope" value="tx"> <span><b>Transactions only</b>: invoices, PIDs, sales documents, receipts, follow-ups and purchase orders. Keeps customers, company details, divisions, reports and the PID / document counters (numbering continues).</span></label>
+      </div>
+      <div class="row" style="margin-top:10px"><label for="clearConfirm">Type <b>ERASE</b> to confirm</label><input type="text" id="clearConfirm" autocomplete="off" style="width:120px"><button class="btn danger" id="btnClear" disabled>Download backup and clear</button></div>
+      <div id="clearMsg" style="margin-top:10px"></div>
+    </div>
     <div class="panel pad">
       <h2>For Tally and analysis</h2>
       <p class="note">Open <b>All lines</b> or <b>Product master</b>, choose a column set under <b>Columns</b> (or tick your own and save it), then use Export CSV or Export Excel. Two ready-made sets are included: “Tally – stock items” for the product master and “Analysis – purchase lines” for all lines. You can change them when you know which fields you need.</p>
@@ -753,6 +763,33 @@ $("restoreFile").onchange=async e=>{ const f=e.target.files[0]; e.target.value="
     let n=0; for(const p of paths){ await S.db.doc(p).set(b.docs[p]); n++; if(n%10===0) msg(m,"warn",`Restoring… ${n} of ${paths.length}`); }
     msg(m,"good",`Restored ${n} records from the backup of ${b.exportedAt||""}.`);
   }catch(err){ msg(m,"bad","Restore failed: "+(err.message||err)); } };
+/* ---------- clear data (admin) ---------- */
+$("clearConfirm").addEventListener("input",e=>{ $("btnClear").disabled = e.target.value.trim()!=="ERASE" || !S.db; });
+$("btnClear").onclick=async()=>{
+  const m=$("clearMsg"), b=$("btnClear"); const scope=(document.querySelector('input[name=clearScope]:checked')||{}).value||"all";
+  if(typeof canEditPanel==="function" && !(S.me&&S.me.isAdmin)){ msg(m,"bad","Only admins can clear data."); return; }
+  if(!downloads){ msg(m,"bad","Downloads aren't available here, so the safety backup can't be saved. Nothing was deleted."); return; }
+  b.disabled=true; $("clearConfirm").value="";
+  try{
+    msg(m,"warn","Preparing the backup…");
+    const bk=await makeBackup();
+    try{ await downloads.save({filename:`implant_register_backup_before_clear_${stamp()}.json`, data:JSON.stringify(bk)}); }
+    catch(e){ msg(m,"bad","The backup wasn't saved"+(e&&e.code==="declined"?" (download declined)":"")+", so nothing was deleted."); return; }
+    const paths=[];
+    const add=(col,obj)=>Object.keys(obj||{}).forEach(id=>paths.push(col+"/"+id));
+    add("invoices",S.invoices); add("chunks",S.chunks); add("registry",S.registry); add("sales",S.sales); add("receipts",S.receipts); add("followups",S.followups); add("purchaseOrders",S.pos);
+    if(scope==="all"){ add("customers",S.customers); add("reports",S.reports); (S.presets||[]).forEach(p=>paths.push("presets/"+p.id)); ["settings/counters","settings/salescounters","settings/company","settings/divisions"].forEach(p=>paths.push(p)); }
+    // invoice headers first so lines disappear together; settings last
+    const ord=p=>p.startsWith("invoices/")?0:p.startsWith("settings/")?2:1; paths.sort((a,c)=>ord(a)-ord(c));
+    let n=0, failed=[];
+    for(const p of paths){ try{ await S.db.doc(p).delete(); }catch(e){ failed.push(p); } n++; if(n%10===0) msg(m,"warn",`Deleting… ${n} of ${paths.length}`); }
+    if(scope==="all"){ S.company={...DEFAULT_COMPANY}; S.divisions=DEFAULT_DIVS.slice(); S.counters={}; }
+    S.sel&&S.sel.clear(); if(S.st){ S.st.draft=null; S.st.reportId=null; S.st.editing=null; } S.ed=null; S.salesView=null; if(typeof S.poEd!=="undefined"){ S.poEd=null; S.poView=null; S.rcEd=null; }
+    msg(m,failed.length?"warn":"good",`Cleared ${paths.length-failed.length} records${scope==="all"?" (everything except users)":" (transactions)"}. The backup file was downloaded first; use Restore from backup if you need the data again.`+(failed.length?` ${failed.length} couldn't be deleted: ${failed.slice(0,5).join(", ")}${failed.length>5?" …":""}.`:""));
+    rebuild();
+  }catch(e){ msg(m,"bad","Stopped: "+(e.message||e.code)+". Some data may already be deleted; your backup file has everything from before."); }
+  finally{ b.disabled=true; }
+};
 fetch("seed.json",{method:"HEAD"}).then(r=>r.ok||fetch("seed.json").then(x=>x.ok)).then(ok=>{ S.hasSeed=!!ok; render(); }).catch(()=>{ S.hasSeed=false; });
 
 $("btnSeed").onclick=async()=>{ const b=$("btnSeed"); b.disabled=true;
