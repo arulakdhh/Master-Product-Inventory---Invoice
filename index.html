@@ -803,9 +803,19 @@ $("fieldtbl").tBodies[0].innerHTML=LINE_FIELDS.map(f=>`<tr><td>${esc(f[1])}</td>
 function regDoc(no){ const g=S.registry[no]||{invoiceNo:no,division:"",lines:{}}; return {invoiceNo:no,division:g.division||"",lines:JSON.parse(JSON.stringify(g.lines||{})),retired:JSON.parse(JSON.stringify(g.retired||[]))}; }
 async function createPids(no, div, rows){
   if(!div) throw new Error("choose a division");
-  const ref=S.db.doc("settings/counters"); const holder="h"+Math.random().toString(36).slice(2);
-  const lease=await ref.acquire({holder,ttlMs:120000});
-  if(!lease.acquired) throw new Error("PIDs are being created on another device; wait a minute");
+  const ref=S.db.doc("settings/counters");
+  return withLease(ref,"h",120000,"PIDs are being created on another device; wait a minute",()=>createPidsLocked(no,div,rows,ref));
+}
+/* Take the counter lock, run fn, and always let go of the lock afterwards (shortening it to 1 s),
+   so the next upload or document doesn't have to wait for it to expire. Waits up to ~15 s if busy. */
+async function withLease(ref,prefix,ttlMs,busyMsg,fn){
+  const holder=prefix+Math.random().toString(36).slice(2); let lease;
+  for(let i=0;i<8;i++){ lease=await ref.acquire({holder,ttlMs}); if(lease.acquired) break; await new Promise(r=>setTimeout(r,2000)); }
+  if(!lease.acquired) throw new Error(busyMsg);
+  try{ return await fn(); }
+  finally{ try{ await ref.acquire({holder,ttlMs:1000}); }catch(e){} }
+}
+async function createPidsLocked(no,div,rows,ref){
   const fresh=await S.db.doc(`registry/${no}`).get(); const d=regDoc(no);
   if(fresh.exists){ const fd=fresh.data(); d.division=fd.division||""; d.lines=JSON.parse(JSON.stringify(fd.lines||{})); d.retired=JSON.parse(JSON.stringify(fd.retired||[])); }
   d.division=div;
@@ -861,7 +871,7 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=5"></script>
+<script src="sales.js?v=6"></script>
 <script src="ops.js?v=3"></script>
 <script src="analytics.js?v=2"></script>
 <script src="studio.js?v=1"></script>

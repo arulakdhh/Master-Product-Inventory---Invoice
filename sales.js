@@ -303,11 +303,12 @@ async function salesClick(e) {
 
 /* ---------- save / cancel ---------- */
 async function nextNumber(type, fy) {
-  const ref = S.db.doc("settings/salescounters"); const holder = "s" + Math.random().toString(36).slice(2);
-  const lease = await ref.acquire({ holder, ttlMs: 60000 }); if (!lease.acquired) throw new Error("another document is being saved right now; try again in a moment");
+  const ref = S.db.doc("settings/salescounters");
+  return withLease(ref, "s", 60000, "another document is being saved right now; try again in a moment", async () => {
   const snap = await ref.get(); const c = { ...((snap.exists && snap.data().counts) || {}) }; const k = type + "_" + fy;
   let seq = (c[k] || 0) + 1; while (S.sales[`${type}_${fy}_${String(seq).padStart(4, "0")}`]) seq++;
   c[k] = seq; await ref.set({ counts: c, updatedAt: new Date().toISOString() }); return seq;
+});
 }
 async function saveDoc(btn) {
   const E = S.ed; const T = DOC_TYPES[E.type];
