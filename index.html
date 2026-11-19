@@ -871,7 +871,7 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=15"></script>
+<script src="sales.js?v=16"></script>
 <script src="ops.js?v=3"></script>
 <script src="analytics.js?v=3"></script>
 <script src="studio.js?v=1"></script>
