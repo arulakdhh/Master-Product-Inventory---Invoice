@@ -194,7 +194,7 @@ function renderProfit() {
     ${tile("Purchase cost (at Rate)", "₹ " + inr(T.cost), "what these items cost you")}
     ${tile("Profit", "₹ " + inr(T.profit), `sales − purchase cost`, T.profit >= 0 ? "pos" : "neg")}
     ${tile("Profit margin", pc(T.sale ? T.profit / T.sale : null), "profit ÷ sales value")}
-    ${tile("Average sold at", achieved == null ? "—" : inr(achieved * 100, 0) + "% of Rate", "after discounts, as entered on the invoices")}
+    ${tile("Profit % on purchase", T.cost ? inr(T.profit / T.cost * 100, 0) + "%" : "—", "profit ÷ purchase cost, after discounts")}
     ${tile("Discounts given", "₹ " + inr(T.disc), "line + hospital + surgeon discounts")}
   </div>
   ${noCost ? `<div class="msg warn">${noCost} invoice line${noCost === 1 ? " has" : "s have"} no purchase rate, so their cost counts as ₹0. Check those products' supplier invoices.</div>` : ""}
@@ -202,12 +202,12 @@ function renderProfit() {
     <span class="seg" role="group" aria-label="Group by">${Object.entries(PROF_BY).map(([k, l]) => `<button data-pfby="${k}" class="${P.by === k ? "on" : ""}">${l}</button>`).join("")}</span>
     <input type="search" id="pfQ" placeholder="Search PID, product, procedure, invoice…" value="${esc(P.q)}">
     <span class="count">${inr(rows.length, 0)} row${rows.length === 1 ? "" : "s"}${rows.length > show.length ? ` (first ${show.length} shown — download Excel for all)` : ""}</span></div>
-    <div class="tablewrap"><table><thead><tr><th>${PROF_BY[P.by]}</th>${P.by !== "line" ? `<th class="num">Invoices</th>` : ""}<th class="num">Qty</th><th class="num">Sales value (₹)</th><th class="num">Purchase cost (₹)</th><th class="num">Profit (₹)</th><th class="num">Margin</th><th class="num">Sold at % of Rate</th><th class="num">Discounts (₹)</th></tr></thead><tbody>
-    ${show.length ? show.map(g => { const at = g.cost ? g.sale / g.cost * 100 : null; const low = g.profit < 0;
+    <div class="tablewrap"><table><thead><tr><th>${PROF_BY[P.by]}</th>${P.by !== "line" ? `<th class="num">Invoices</th>` : ""}<th class="num">Qty</th><th class="num">Sales value (₹)</th><th class="num">Purchase cost (₹)</th><th class="num">Profit (₹)</th><th class="num">Margin</th><th class="num">Profit % on purchase</th><th class="num">Discounts (₹)</th></tr></thead><tbody>
+    ${show.length ? show.map(g => { const at = g.cost ? g.profit / g.cost * 100 : null; const low = g.profit < 0;
       return `<tr class="${low ? "lowp" : ""}"><td><b>${esc(g.name)}</b>${g.sub ? `<div class="note">${esc(g.sub)}</div>` : ""}</td>${P.by !== "line" ? `<td class="num">${inr(g.invoices, 0)}</td>` : ""}<td class="num">${inr(g.qty, 0)}</td><td class="num">${inr(g.sale)}</td><td class="num">${inr(g.cost)}${g.noCost ? `<div class="note neg">no rate</div>` : ""}</td>
       <td class="num ${g.profit >= 0 ? "pos" : "neg"}"><b>${inr(g.profit)}</b></td><td class="num">${pc(g.sale ? g.profit / g.sale : null)}</td><td class="num">${at == null ? "—" : inr(at, 0) + "%"}${low ? `<div class="note neg">loss</div>` : ""}</td><td class="num">${inr(g.disc)}</td></tr>`; }).join("")
       : `<tr><td colspan="9" class="empty">No tax invoices in this period.</td></tr>`}
-    ${show.length ? `<tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total</td>${P.by !== "line" ? `<td class="num">${inr(invs, 0)}</td>` : ""}<td class="num">${inr(T.qty, 0)}</td><td class="num">${inr(T.sale)}</td><td class="num">${inr(T.cost)}</td><td class="num">${inr(T.profit)}</td><td class="num">${pc(T.sale ? T.profit / T.sale : null)}</td><td class="num">${achieved == null ? "—" : inr(achieved * 100, 0) + "%"}</td><td class="num">${inr(T.disc)}</td></tr>` : ""}
+    ${show.length ? `<tr style="font-weight:700;border-top:2px solid var(--line)"><td>Total</td>${P.by !== "line" ? `<td class="num">${inr(invs, 0)}</td>` : ""}<td class="num">${inr(T.qty, 0)}</td><td class="num">${inr(T.sale)}</td><td class="num">${inr(T.cost)}</td><td class="num">${inr(T.profit)}</td><td class="num">${pc(T.sale ? T.profit / T.sale : null)}</td><td class="num">${T.cost ? inr(T.profit / T.cost * 100, 0) + "%" : "—"}</td><td class="num">${inr(T.disc)}</td></tr>` : ""}
     </tbody></table></div>
     <div class="note" style="padding:8px 12px">Rows shaded red were sold at a loss (below the purchase rate). Profit here is before your own expenses (freight, salaries, rent).</div></div>`;
 
@@ -218,11 +218,11 @@ function renderProfit() {
   $("pfQ").oninput = e => { P.q = e.target.value; clearTimeout(renderProfit._t); renderProfit._t = setTimeout(() => { renderProfit(); const x = $("pfQ"); x.focus(); x.setSelectionRange(x.value.length, x.value.length); }, 250); };
   $("pfXlsx").onclick = async () => {
     const pctv = (a, b) => b ? r2(a / b * 100) : "";
-    const head = ["Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sold at % of Rate", "Discounts (₹)"];
-    const sheet = by => { const g = profGroup(F, by); return [[PROF_BY[by], "Detail", "Invoices", "Qty", ...head], ...g.map(x => [x.name, x.sub || "", x.invoices || 1, x.qty, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), pctv(x.sale, x.cost), x.disc])]; };
-    const lines = [["Invoice no.", "Date", "Customer", "Procedure", "Surgeon", "Patient / IP no.", "Line", "PID", "Material code", "Description", "Division", "Qty", "Purchase rate (₹)", "Selling rate (₹)", "Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sell % entered", "Sold at % of Rate (after discounts)", "Discounts (₹)"],
-      ...F.map(x => [x.no, dmy(x.date), x.customer, x.procedure, x.surgeon, x.patient, x.line, x.pid, x.mat, x.desc, x.div, x.qty, x.unitCost, x.rate, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), x.sellPct === "" || x.sellPct == null ? "" : x.sellPct, pctv(x.sale, x.cost), x.disc])];
-    const sum = [["Profit report", label + (P.div ? " · " + divName(P.div) : " · all divisions")], [], ["Sales value excl. GST (₹)", T.sale], ["Purchase cost at Rate (₹)", T.cost], ["Profit (₹)", T.profit], ["Margin %", pctv(T.profit, T.sale)], ["Sold at % of Rate", pctv(T.sale, T.cost)], ["Discounts given (₹)", T.disc], ["Invoices", invs], ["Units", T.qty]];
+    const head = ["Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin % (on sale)", "Profit % on purchase", "Discounts (₹)"];
+    const sheet = by => { const g = profGroup(F, by); return [[PROF_BY[by], "Detail", "Invoices", "Qty", ...head], ...g.map(x => [x.name, x.sub || "", x.invoices || 1, x.qty, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), pctv(x.profit, x.cost), x.disc])]; };
+    const lines = [["Invoice no.", "Date", "Customer", "Procedure", "Surgeon", "Patient / IP no.", "Line", "PID", "Material code", "Description", "Division", "Qty", "Purchase rate (₹)", "Selling rate (₹)", "Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sell % entered (added on purchase)", "Profit % on purchase (after discounts)", "Discounts (₹)"],
+      ...F.map(x => [x.no, dmy(x.date), x.customer, x.procedure, x.surgeon, x.patient, x.line, x.pid, x.mat, x.desc, x.div, x.qty, x.unitCost, x.rate, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), x.sellPct === "" || x.sellPct == null ? "" : x.sellPct, pctv(x.profit, x.cost), x.disc])];
+    const sum = [["Profit report", label + (P.div ? " · " + divName(P.div) : " · all divisions")], [], ["Sales value excl. GST (₹)", T.sale], ["Purchase cost at Rate (₹)", T.cost], ["Profit (₹)", T.profit], ["Margin % (on sale)", pctv(T.profit, T.sale)], ["Profit % on purchase", pctv(T.profit, T.cost)], ["Discounts given (₹)", T.disc], ["Invoices", invs], ["Units", T.qty]];
     await save(`Profit_report_${todayIso()}.xlsx`, xlsxFrom([["Summary", sum], ["By invoice", sheet("invoice")], ["By procedure", sheet("procedure")], ["By surgeon", sheet("surgeon")], ["Each instrument", lines], ["By product", sheet("product")], ["By customer", sheet("customer")], ["By division", sheet("div")], ["By month", sheet("month")]]));
   };
 }

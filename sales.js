@@ -97,7 +97,7 @@ function availFor(key) { const r = stockFor(key); if (!r) return 0; const m = so
 function addLine(key) {
   const r = stockFor(key); if (!r) return;
   if (S.ed.lines.some(l => l.key === key)) { edMsg("That PID is already on this document. Change its quantity instead."); return; }
-  S.ed.lines.push({ key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, mat: r.mat, desc: r.desc, hsn: r.hsn, batch: r.batch, serial: r.serial || "", exp: r.exp, uom: r.uom, qty: 1, mrp: r.mrp, rate: S.ed.type === "PO" ? r.mrp : (S.ed.pctAll > 0 && costOfItem(r) ? r2(costOfItem(r) * S.ed.pctAll / 100) : 0), cost: typeof costOfItem === "function" ? costOfItem(r) : 0, sellPct: S.ed.type !== "PO" && S.ed.pctAll > 0 && costOfItem(r) ? +S.ed.pctAll : "", discPct: 0, gstRate: r.igstRate || 0, remarks: "" });
+  S.ed.lines.push({ key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, mat: r.mat, desc: r.desc, hsn: r.hsn, batch: r.batch, serial: r.serial || "", exp: r.exp, uom: r.uom, qty: 1, mrp: r.mrp, rate: S.ed.type === "PO" ? r.mrp : (S.ed.pctAll > 0 && costOfItem(r) ? markupRate(costOfItem(r), S.ed.pctAll) : 0), cost: typeof costOfItem === "function" ? costOfItem(r) : 0, sellPct: S.ed.type !== "PO" && S.ed.pctAll > 0 && costOfItem(r) ? +S.ed.pctAll : "", discPct: 0, gstRate: r.igstRate || 0, remarks: "" });
   renderEditor();
 }
 function edMsg(t, kind = "warn") { const el = document.getElementById("edMsg"); if (el) { el.className = "msg " + kind; el.textContent = t; el.classList.remove("hidden"); } }
@@ -221,17 +221,17 @@ function renderEditor() {
    </div>`}
    ${E.type !== "PO" && typeof lineCost === "function" ? `<div class="row" style="margin-top:10px;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">
      ${(() => { const pt = edPurchaseTotal(E); const n = E.lines.length; return `<span><b>Products purchase total</b> <span class="note">(Rate × Qty, ${n} product${n === 1 ? "" : "s"}, ${inr(E.lines.reduce((a, l) => a + (+l.qty || 0), 0), 0)} pcs)</span> <b>₹ ${inr(pt)}</b></span>
-     <span>×</span><input type="number" id="edPctAll" min="0" step="0.01" value="${E.pctAll || ""}" placeholder="Sell %" style="width:90px" aria-label="Selling percent for all lines"><span>%</span>
-     <span>= <b>Selling total ₹ <span id="edPctCalc">${E.pctAll > 0 ? inr(r2(pt * E.pctAll / 100)) : "—"}</span></b></span>
+     <span>+</span><input type="number" id="edPctAll" min="0" step="0.01" value="${E.pctAll || ""}" placeholder="Sell %" style="width:90px" aria-label="Selling percent added on the purchase total"><span>% <span class="note">(= ₹ <span id="edPctAdd">${E.pctAll > 0 ? inr(r2(pt * E.pctAll / 100)) : "—"}</span> profit)</span></span>
+     <span>= <b>Selling total ₹ <span id="edPctCalc">${E.pctAll > 0 ? inr(markupRate(pt, E.pctAll)) : "—"}</span></b></span>
      <button class="btn primary" id="edPctApply" ${n ? "" : "disabled"}>Apply to all lines</button>
-     <span class="note" style="flex-basis:100%">Every line gets this %, so the line amounts add up to the selling total (before any hospital or surgeon discount and GST). You can still change the % on any single line. Not printed.</span>`; })()}</div>` : ""}
+     <span class="note" style="flex-basis:100%">The % is added on top of the purchase amount: e.g. ₹4,000 + 200% = ₹12,000. Every line gets this %, so the line amounts add up to the selling total (before any hospital or surgeon discount and GST). You can still change the % on any single line. Not printed.</span>`; })()}</div>` : ""}
    <div class="tablewrap" style="margin-top:10px;max-height:none"><table class="edtable">
-     <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th>${E.type !== "PO" ? `<th class="num" title="Your purchase rate from the supplier invoice (not printed)">Purchase rate</th><th class="num" title="Selling price as % of the purchase rate">Sell %</th>` : ""}<th class="num">${E.type !== "PO" ? "Selling rate" : "Rate"}</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
+     <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th>${E.type !== "PO" ? `<th class="num" title="Your purchase rate from the supplier invoice (not printed)">Purchase rate</th><th class="num" title="% added on top of the purchase rate (₹4,000 + 200% = ₹12,000)">Sell % (added)</th>` : ""}<th class="num">${E.type !== "PO" ? "Selling rate" : "Rate"}</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
      <tbody>${E.lines.length ? E.lines.map((l, i) => { const c = calcLine(l, intra, O); const av = availFor(l.key); const over = T.deducts && !E.fromDc && l.qty > av;
        return `<tr><td>${i + 1}</td><td class="dhh">${esc(l.pid)}</td><td class="desc">${esc(l.desc)}<div class="note">${esc(l.mat)} · HSN ${esc(l.hsn)}</div></td><td class="code">${esc(l.batch)}${l.serial ? "<br>" + esc(l.serial) : ""}</td><td>${esc(l.exp)}</td><td class="num">${E.fromDc ? inr(l.dcPending, 0) : inr(av, 0)}</td>
        <td class="num"><input type="number" min="1" step="1" data-l="qty" data-i="${i}" value="${l.qty}" style="width:64px;text-align:right;${over ? "border-color:var(--bad)" : ""}" ${l.serial ? "readonly" : ""} aria-label="Quantity line ${i + 1}"></td>
        <td class="num">${inr(l.mrp)}</td>
-       ${E.type !== "PO" ? (() => { const uc = typeof lineCost === "function" ? lineCost(l) : 0; const sp = uc ? r2(l.rate / uc * 100) : 0;
+       ${E.type !== "PO" ? (() => { const uc = typeof lineCost === "function" ? lineCost(l) : 0; const sp = markupPct(uc, l.rate);
          return `<td class="num" style="background:var(--bg)">${uc ? `${inr(uc)}${l.qty > 1 ? `<div class="note">× ${l.qty} = ${inr(r2(uc * l.qty))}</div>` : ""}` : `<span class="note neg">no rate</span>`}</td><td class="num"><input type="number" min="0" step="0.01" data-l="sellPct" data-i="${i}" value="${uc && l.rate > 0 ? sp : ""}" placeholder="%" ${uc ? "" : "disabled"} style="width:70px;text-align:right;${!(l.rate > 0) ? "border-color:var(--warn,#d08700)" : ""}" aria-label="Selling percent line ${i + 1}">${l.rate > 0 ? `<div class="note">profit ${inr(r2(c.taxable - uc * l.qty))}</div>` : `<div class="note">enter %</div>`}</td>`; })() : ""}
        <td class="num"><input type="number" min="0" step="0.01" data-l="rate" data-i="${i}" value="${l.rate}" style="width:96px;text-align:right" aria-label="Rate line ${i + 1}"></td>
        <td class="num"><input type="number" min="0" max="100" step="0.01" data-l="discPct" data-i="${i}" value="${l.discPct}" style="width:64px;text-align:right" aria-label="Discount line ${i + 1}"></td>
@@ -243,7 +243,7 @@ function renderEditor() {
    <div class="row" style="justify-content:space-between;margin-top:10px;align-items:flex-start">
      <div id="edMsg" class="hidden"></div>
      ${typeof lineProfit === "function" && E.type !== "PO" && E.lines.length ? (() => { const pp = E.lines.map(l => lineProfit(l, intra, O)); const sv = r2(pp.reduce((a, x) => a + x.sale, 0)), cv = r2(pp.reduce((a, x) => a + x.cost, 0)), pv = r2(sv - cv);
-       return `<dl class="kv" style="margin-left:auto;text-align:right;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:8px 12px" title="For you only, never printed"><dt><b>Profit on this ${esc(T.short || T.name).toLowerCase()}</b></dt><dd class="note">not printed</dd><dt>Sale value (excl. GST)</dt><dd>${inr(sv)}</dd><dt>Purchase cost (Rate × qty)</dt><dd>− ${inr(cv)}</dd><dt><b>Profit</b></dt><dd><b class="${pv >= 0 ? "pos" : "neg"}">₹ ${inr(pv)}</b></dd><dt>Margin · sold at</dt><dd>${sv ? (pv / sv * 100).toFixed(1) + "%" : "—"} · ${cv ? inr(sv / cv * 100, 0) + "% of Rate" : "—"}</dd></dl>`; })() : ""}
+       return `<dl class="kv" style="margin-left:auto;text-align:right;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:8px 12px" title="For you only, never printed"><dt><b>Profit on this ${esc(T.short || T.name).toLowerCase()}</b></dt><dd class="note">not printed</dd><dt>Sale value (excl. GST)</dt><dd>${inr(sv)}</dd><dt>Purchase cost (Rate × qty)</dt><dd>− ${inr(cv)}</dd><dt><b>Profit</b></dt><dd><b class="${pv >= 0 ? "pos" : "neg"}">₹ ${inr(pv)}</b></dd><dt>Profit % on purchase</dt><dd>${cv ? inr(pv / cv * 100, 0) + "%" : "—"}</dd><dt>Margin on sale value</dt><dd>${sv ? (pv / sv * 100).toFixed(1) + "%" : "—"}</dd></dl>`; })() : ""}
      <dl class="kv" style="margin-left:auto;text-align:right">
        <dt>Gross value</dt><dd class="num">${inr(tot.amount)}</dd>
        ${O.hospOn ? `<dt>Less: Hospital discount ${inr(O.hospPct)}%</dt><dd>− ${inr(tot.hospDisc)}</dd>` : ""}${O.surgOn ? `<dt>Less: Surgeon discount ${inr(O.surgPct)}%</dt><dd>− ${inr(tot.surgDisc)}</dd>` : ""}
@@ -279,12 +279,14 @@ function salesInput(e) {
   if (t.id === "edRef") { E.yourRef = t.value; return; }
   if (t.id === "edCredit") { E.creditDays = t.value === "" ? "" : Math.max(0, Math.round(+t.value || 0)); return; }
   if (t.id === "edPrep") { E.preparedBy = t.value; return; }
-  if (t.id === "edPctAll") { E.pctAll = t.value === "" ? "" : Math.max(0, parseFloat(t.value) || 0); const c = document.getElementById("edPctCalc"); if (c) c.textContent = E.pctAll > 0 ? inr(r2(edPurchaseTotal(E) * E.pctAll / 100)) : "—"; return; }
+  if (t.id === "edPctAll") { E.pctAll = t.value === "" ? "" : Math.max(0, parseFloat(t.value) || 0); const c = document.getElementById("edPctCalc"); const pt = edPurchaseTotal(E); if (c) c.textContent = E.pctAll > 0 ? inr(markupRate(pt, E.pctAll)) : "—"; const a = document.getElementById("edPctAdd"); if (a) a.textContent = E.pctAll > 0 ? inr(r2(pt * E.pctAll / 100)) : "—"; return; }
   if (t.id === "edProc" || t.id === "edSurg" || t.id === "edPat") { E.case = E.case || {}; E.case[{ edProc: "procedure", edSurg: "surgeon", edPat: "patient" }[t.id]] = t.value; return; }
   if (t.dataset.o && t.type === "number") { E.opts[t.dataset.o] = t.value === "" ? "" : (parseFloat(t.value) || 0); return; }
   if (t.dataset.l) { const l = E.lines[+t.dataset.i]; const k = t.dataset.l; l[k] = k === "remarks" ? t.value : (parseFloat(t.value) || 0); if (k === "qty") l.qty = Math.max(0, Math.round(l.qty));
-    if (typeof lineCost === "function" && (k === "sellPct" || k === "rate")) { const uc = lineCost(l); if (k === "sellPct") { if (t.value === "") { l.sellPct = ""; l.rate = 0; } else if (uc) l.rate = r2(uc * l.sellPct / 100); } else l.sellPct = uc ? r2(l.rate / uc * 100) : 0; } }
+    if (typeof lineCost === "function" && (k === "sellPct" || k === "rate")) { const uc = lineCost(l); if (k === "sellPct") { if (t.value === "") { l.sellPct = ""; l.rate = 0; } else if (uc) l.rate = markupRate(uc, l.sellPct); } else l.sellPct = markupPct(uc, l.rate); } }
 }
+function markupRate(uc, p) { return r2((+uc || 0) * (1 + (+p || 0) / 100)); }       // 4,000 + 200% = 12,000
+function markupPct(uc, rate) { return uc ? r2(((+rate || 0) / uc - 1) * 100) : 0; }  // 12,000 on 4,000 = 200%
 function edPurchaseTotal(E) { return r2(E.lines.reduce((a, l) => a + (typeof lineCost === "function" ? lineCost(l) : 0) * (+l.qty || 0), 0)); }
 function salesChange(e) {
   const t = e.target; const E = S.ed;
@@ -305,7 +307,7 @@ async function salesClick(e) {
   if (b.id === "xAdd") { E.extra.push({ label: "", value: "" }); return renderEditor(); }
   if (b.dataset.xdel) { E.extra.splice(+b.dataset.xdel, 1); if (!E.extra.length) E.extra.push({ label: "", value: "" }); return renderEditor(); }
   if (b.id === "edCancel") { S.ed = null; S._pickq = ""; return renderEditor(); }
-  if (b.id === "edPctApply") { const p = +E.pctAll; if (!(p > 0)) { edMsg("Enter the sell % first, e.g. 200.", "bad"); return; } for (const l of E.lines) { const uc = lineCost(l); if (uc) { l.sellPct = p; l.rate = r2(uc * p / 100); } } return renderEditor(); }
+  if (b.id === "edPctApply") { const p = +E.pctAll; if (!(p > 0)) { edMsg("Enter the sell % first, e.g. 200.", "bad"); return; } for (const l of E.lines) { const uc = lineCost(l); if (uc) { l.sellPct = p; l.rate = markupRate(uc, p); } } return renderEditor(); }
   if (b.id === "edSave") return saveDoc(b);
   if (b.dataset.view) { S.salesView = b.dataset.view; return renderDocView(b.dataset.view, true); }
   if (b.dataset.editq) return editQuotation(b.dataset.editq);
@@ -354,7 +356,7 @@ async function saveDoc(btn) {
     let customerId = E.customerId;
     if (!customerId) { customerId = "c" + Date.now().toString(36); await S.db.doc(`customers/${customerId}`).set({ name: cust.name, address: cust.address, gstin: cust.gstin, stateCode: cust.stateCode, stateName: cust.stateName, dl: cust.dl, phone: cust.phone }); }
     const lines = E.lines.map(l => { const c = calcLine(l, intra, opts); const uc = typeof lineCost === "function" ? lineCost(l) : 0; const cv = r2(uc * (l.qty || 0));
-      return { ...l, ...c, ...(E.type !== "PO" ? { cost: uc, sellPct: uc ? r2(l.rate / uc * 100) : 0, costValue: cv, profit: r2(c.taxable - cv) } : {}) }; });
+      return { ...l, ...c, ...(E.type !== "PO" ? { cost: uc, sellPct: markupPct(uc, l.rate), costValue: cv, profit: r2(c.taxable - cv) } : {}) }; });
     const dueDate = E.type === "INV" ? (() => { const d = new Date(E.date); d.setDate(d.getDate() + (+E.creditDays || 0)); return d.toISOString().slice(0, 10); })() : "";
     const base = { dueDate, creditDays: E.type === "INV" ? (+E.creditDays || 0) : null, opts, validUntil: E.validUntil || "", yourRef: E.yourRef || "", preparedBy: E.preparedBy || "", type: E.type, date: E.date, customerId, customer: cust, intra, extra: E.extra.filter(x => x.label.trim() || x.value.trim()), notes: E.notes, lines, totals, company: { ...S.company }, case: E.type !== "PO" ? { procedure: (E.case?.procedure || "").trim(), surgeon: (E.case?.surgeon || "").trim(), patient: (E.case?.patient || "").trim() } : null };
     let id, no;
