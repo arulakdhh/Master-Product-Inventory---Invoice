@@ -506,15 +506,14 @@ function buildPdf(d) {
   const docDisc = O.hospOn || O.surgOn; const hasGst = r2((t.cgst || 0) + (t.sgst || 0) + (t.igst || 0)) > 0;
   const showRate = d.type !== "PO" && d.lines.some(l => r2(l.rate) !== r2(l.mrp)); const showLineDisc = d.lines.some(l => l.discPct);
   const rates = [...new Set(d.lines.map(l => l.gstRate))]; const gstLbl = rates.length === 1 ? ` ${n2(rates[0]).replace(/\.00$/, "")}%` : "";
-  const isPO = d.type === "PO"; const cols = [["S.No", 11, "c"], [isPO ? "Material Code" : "DHH PID", isPO ? 26 : 19, "c"], ["Product Name", 0, "l"], [isPO ? "Rate (₹)" : "MRP (₹)", 22, "r"]];
-  if (showRate) cols.push(["Rate (₹)", 21, "r"]);
+  const isPO = d.type === "PO"; const cols = [["S.No", 11, "c"], [isPO ? "Material Code" : "DHH PID", isPO ? 26 : 19, "c"], ["Product Name", 0, "l"], ["Rate (₹)", 24, "r"]];   // no MRP column on printed documents
   cols.push(["Quantity", 17, "c"]); if (showLineDisc) cols.push(["Disc %", 13, "r"]);
   cols.push(["Total Quantity Amount", 25, "r"]);
   const fixed = cols.reduce((a, c) => a + c[1], 0); cols[2][1] = W - 2 * M - fixed;
   const body = d.lines.map((l, i) => {
     const sub = isPO ? [l.batch ? "Batch " + l.batch : "", l.serial ? "S/N " + l.serial : "", l.exp ? "Exp " + l.exp : "", l.hsn ? "HSN " + l.hsn : ""].filter(Boolean).join(" · ") + (l.remarks ? "\n" + l.remarks : "") : (l.remarks || "");   // invoices etc.: product name only (+ your line remark, if any)
-    const row = [i + 1, { content: (isPO ? l.mat : l.pid) || "—", styles: { fontStyle: "bold", textColor: DARK, fontSize: isPO ? 7 : 8.2 } }, { content: l.desc + (sub ? "\n" + sub : ""), _main: l.desc, styles: { fontStyle: "bold" } }, n2(isPO ? l.rate : l.mrp)];
-    if (showRate) row.push(n2(l.rate)); row.push(l.qty); if (showLineDisc) row.push(n2(l.discPct));
+    const row = [i + 1, { content: (isPO ? l.mat : l.pid) || "—", styles: { fontStyle: "bold", textColor: DARK, fontSize: isPO ? 7 : 8.2 } }, { content: l.desc + (sub ? "\n" + sub : ""), _main: l.desc, styles: { fontStyle: "bold" } }, n2(l.rate)];
+    row.push(l.qty); if (showLineDisc) row.push(n2(l.discPct));
     row.push(n2(l.amount ?? l.taxable));
     return row; });
   doc.autoTable({ startY: y, margin: { left: M, right: M }, theme: "grid", head: [cols.map(c => c[0])], body,
@@ -527,10 +526,10 @@ function buildPdf(d) {
       ls.forEach((ln, k) => { const isMain = k < mainLeft; doc.setFont("FreeSans", isMain ? "bold" : "normal"); doc.setFontSize(isMain ? 8.2 : 7); setC(isMain ? INK : GREY); doc.text(ln, c.cell.x + 2, yy); yy += isMain ? 3.5 : 3.1; }); } } });
   y = doc.lastAutoTable.finalY + 2;
   doc.setFont("FreeSans", "italic"); doc.setFontSize(7.2); setC(GREY);
-  doc.text(`Total Quantity Amount = ${showRate || isPO ? "Rate" : "MRP"} × Quantity${showLineDisc ? " − discount" : ""}.${hasGst ? ` GST is added in the totals below${docDisc ? ", after the discounts" : ""}.` : ""}`, M, y + 2); y += 7;
+  doc.text(`Total Quantity Amount = Rate × Quantity${showLineDisc ? " − discount" : ""}.${hasGst ? ` GST is added in the totals below${docDisc ? ", after the discounts" : ""}.` : ""}`, M, y + 2); y += 7;
   // totals box
   if (y > 225) { doc.addPage(); y = 18; }
-  const rows = [[`Gross Value (${showRate || isPO ? "Rate" : "MRP"} × Qty)`, "₹ " + n2(t.amount ?? t.taxable)]];
+  const rows = [[`Gross Value (Rate × Qty)`, "₹ " + n2(t.amount ?? t.taxable)]];
   if (O.hospOn) rows.push([`Less: Hospital Discount @ ${n2(O.hospPct).replace(/\.00$/, "")}%`, "− ₹ " + n2(t.hospDisc)]);
   if (O.surgOn) rows.push([`Less: Surgeon Discount @ ${n2(O.surgPct).replace(/\.00$/, "")}%`, "− ₹ " + n2(t.surgDisc)]);
   if (docDisc) rows.push(["Taxable Value", "₹ " + n2(t.taxable)]);
