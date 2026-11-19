@@ -15,10 +15,6 @@ S.prof = { range: "fy", from: "", to: "", div: "", by: "invoice", q: "", open: n
 
 /* ---------- core rules ---------- */
 function costOfItem(it) { if (!it) return 0; return r2(+it.rate || (it.qty ? (+it.taxable || 0) / it.qty : 0)); }
-/* real cost of one unit = what that supplier invoice line actually charged: taxable value (after the supplier's discount, excl. GST) ÷ qty.
-   The discount changes from invoice to invoice, so every stock line keeps its own cost. Used for stock value and real profit;
-   selling prices (sell % of Rate) still use costOfItem above. */
-function netCostOfItem(it) { if (!it) return 0; return it.qty && it.taxable != null && it.taxable !== "" ? (+it.taxable || 0) / it.qty : costOfItem(it); } // unrounded so qty × cost adds back to the invoice exactly
 function pricingPct(mat, div) {
   const P = S.pricing || {}; const o = (P.mat || {})[mat];
   if (o && +o.pct > 0) return +o.pct;
@@ -32,8 +28,6 @@ function sellPrice(mat, div, rate) {
 function priceBasis(mat, div) { const o = ((S.pricing || {}).mat || {})[mat]; if (o && +o.price > 0) return "fixed price"; if (o && +o.pct > 0) return "product %"; if (+((S.pricing || {}).divPct || {})[div] > 0) return "division %"; return "default %"; }
 /* cost of one sales line: what was remembered when it was added, else the stock line's purchase rate */
 function lineCost(l) { if (+l.cost > 0) return +l.cost; const it = S.items.find(r => r.key === l.key); return costOfItem(it); }
-/* real cost of one sales line: the net cost of the exact stock line (batch) it was sold from */
-function lineNetCost(l, itemByKey) { const it = itemByKey ? itemByKey.get(l.key) : S.items.find(r => r.key === l.key); return it ? netCostOfItem(it) : lineCost(l); }
 function lineProfit(l, intra, opts) { const c = calcLine(l, intra, opts); const cost = r2(lineCost(l) * (+l.qty || 0)); return { sale: c.taxable, cost, profit: r2(c.taxable - cost), disc: r2(c.disc + c.hospDisc + c.surgDisc) }; }
 
 /* ---------- settings ---------- */
@@ -155,8 +149,7 @@ function profFacts() {
       const it = itemByKey.get(l.key) || {}; const dv = it.divCode || ""; if (div && dv !== div) return;
       const sale = r2(l.taxable != null ? l.taxable : calcLine(l, intra, d.opts).taxable);
       const unit = lineCost(l); const cost = r2(unit * (+l.qty || 0)); const disc = r2((l.disc || 0) + (l.hospDisc || 0) + (l.surgDisc || 0));
-      const netCost = r2(lineNetCost(l, itemByKey) * (+l.qty || 0));
-      out.push({ netCost, invId: id, no: d.no, date: d.date, month: d.date.slice(0, 7), customer: (d.customer && d.customer.name) || "", procedure: cs.procedure || "", surgeon: cs.surgeon || "", patient: cs.patient || "", line: i + 1, pid: l.pid || "", mat: l.mat || "", desc: l.desc || "", div: dv, qty: +l.qty || 0, unitCost: unit, rate: +l.rate || 0, sale, disc, cost, profit: r2(sale - cost), target: pricingPct(l.mat, dv), sellPct: l.sellPct, noCost: !unit });
+      out.push({ invId: id, no: d.no, date: d.date, month: d.date.slice(0, 7), customer: (d.customer && d.customer.name) || "", procedure: cs.procedure || "", surgeon: cs.surgeon || "", patient: cs.patient || "", line: i + 1, pid: l.pid || "", mat: l.mat || "", desc: l.desc || "", div: dv, qty: +l.qty || 0, unitCost: unit, rate: +l.rate || 0, sale, disc, cost, profit: r2(sale - cost), target: pricingPct(l.mat, dv), sellPct: l.sellPct, noCost: !unit });
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.no < b.no ? 1 : -1));
@@ -178,8 +171,8 @@ function profGroup(F, by) {
 function renderProfit() {
   const el = $("tab-profit"); if (!el) return;
   const P = S.prof; const [, , label] = profRange(); const F = profFacts();
-  const T = F.reduce((a, x) => (a.sale += x.sale, a.cost += x.cost, a.profit += x.profit, a.disc += x.disc, a.qty += x.qty, a.netCost += x.netCost, a), { sale: 0, cost: 0, profit: 0, disc: 0, qty: 0, netCost: 0 });
-  for (const k of ["sale", "cost", "profit", "disc", "netCost"]) T[k] = r2(T[k]); T.realProfit = r2(T.sale - T.netCost);
+  const T = F.reduce((a, x) => (a.sale += x.sale, a.cost += x.cost, a.profit += x.profit, a.disc += x.disc, a.qty += x.qty, a), { sale: 0, cost: 0, profit: 0, disc: 0, qty: 0 });
+  for (const k of ["sale", "cost", "profit", "disc"]) T[k] = r2(T[k]);
   const invs = new Set(F.map(x => x.invId)).size; const noCost = F.filter(x => x.noCost).length;
   const pc = v => v == null || !isFinite(v) ? "—" : (v * 100).toFixed(1) + "%";
   const target = +S.pricing.defaultPct || 200; const achieved = T.cost ? T.sale / T.cost : null;
@@ -201,7 +194,6 @@ function renderProfit() {
     ${tile("Purchase cost (at Rate)", "₹ " + inr(T.cost), "what these items cost you")}
     ${tile("Profit", "₹ " + inr(T.profit), `sales − purchase cost`, T.profit >= 0 ? "pos" : "neg")}
     ${tile("Profit margin", pc(T.sale ? T.profit / T.sale : null), "profit ÷ sales value")}
-    ${tile("Real profit (after supplier discount)", "₹ " + inr(T.realProfit), `real cost ₹ ${inr(T.netCost)} · margin ${pc(T.sale ? T.realProfit / T.sale : null)} · same as Sales analysis`, T.realProfit >= 0 ? "pos" : "neg")}
     ${tile("Average sold at", achieved == null ? "—" : inr(achieved * 100, 0) + "% of Rate", "after discounts, as entered on the invoices")}
     ${tile("Discounts given", "₹ " + inr(T.disc), "line + hospital + surgeon discounts")}
   </div>
@@ -230,7 +222,7 @@ function renderProfit() {
     const sheet = by => { const g = profGroup(F, by); return [[PROF_BY[by], "Detail", "Invoices", "Qty", ...head], ...g.map(x => [x.name, x.sub || "", x.invoices || 1, x.qty, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), pctv(x.sale, x.cost), x.disc])]; };
     const lines = [["Invoice no.", "Date", "Customer", "Procedure", "Surgeon", "Patient / IP no.", "Line", "PID", "Material code", "Description", "Division", "Qty", "Purchase rate (₹)", "Selling rate (₹)", "Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sell % entered", "Sold at % of Rate (after discounts)", "Discounts (₹)"],
       ...F.map(x => [x.no, dmy(x.date), x.customer, x.procedure, x.surgeon, x.patient, x.line, x.pid, x.mat, x.desc, x.div, x.qty, x.unitCost, x.rate, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), x.sellPct === "" || x.sellPct == null ? "" : x.sellPct, pctv(x.sale, x.cost), x.disc])];
-    const sum = [["Profit report", label + (P.div ? " · " + divName(P.div) : " · all divisions")], [], ["Sales value excl. GST (₹)", T.sale], ["Purchase cost at Rate (₹)", T.cost], ["Profit (₹)", T.profit], ["Margin %", pctv(T.profit, T.sale)], ["Real cost after supplier discount (₹)", T.netCost], ["Real profit (₹)", T.realProfit], ["Real margin %", pctv(T.realProfit, T.sale)], ["Sold at % of Rate", pctv(T.sale, T.cost)], ["Discounts given (₹)", T.disc], ["Invoices", invs], ["Units", T.qty]];
+    const sum = [["Profit report", label + (P.div ? " · " + divName(P.div) : " · all divisions")], [], ["Sales value excl. GST (₹)", T.sale], ["Purchase cost at Rate (₹)", T.cost], ["Profit (₹)", T.profit], ["Margin %", pctv(T.profit, T.sale)], ["Sold at % of Rate", pctv(T.sale, T.cost)], ["Discounts given (₹)", T.disc], ["Invoices", invs], ["Units", T.qty]];
     await save(`Profit_report_${todayIso()}.xlsx`, xlsxFrom([["Summary", sum], ["By invoice", sheet("invoice")], ["By procedure", sheet("procedure")], ["By surgeon", sheet("surgeon")], ["Each instrument", lines], ["By product", sheet("product")], ["By customer", sheet("customer")], ["By division", sheet("div")], ["By month", sheet("month")]]));
   };
 }

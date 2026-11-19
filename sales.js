@@ -220,8 +220,11 @@ function renderEditor() {
      <div id="pickres"></div>
    </div>`}
    ${E.type !== "PO" && typeof lineCost === "function" ? `<div class="row" style="margin-top:10px;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">
-     <b>Sell % for this ${esc((T.short || T.name).toLowerCase())}</b><input type="number" id="edPctAll" min="0" step="0.01" value="${E.pctAll || ""}" placeholder="e.g. 200" style="width:90px" aria-label="Selling percent for all lines"><span>% of purchase rate</span>
-     <button class="btn" id="edPctApply" ${E.lines.length ? "" : "disabled"}>Apply to all lines</button><span class="note">or type a different % (or selling rate) on any line. Not printed.</span></div>` : ""}
+     ${(() => { const pt = edPurchaseTotal(E); const n = E.lines.length; return `<span><b>Products purchase total</b> <span class="note">(Rate × Qty, ${n} product${n === 1 ? "" : "s"}, ${inr(E.lines.reduce((a, l) => a + (+l.qty || 0), 0), 0)} pcs)</span> <b>₹ ${inr(pt)}</b></span>
+     <span>×</span><input type="number" id="edPctAll" min="0" step="0.01" value="${E.pctAll || ""}" placeholder="Sell %" style="width:90px" aria-label="Selling percent for all lines"><span>%</span>
+     <span>= <b>Selling total ₹ <span id="edPctCalc">${E.pctAll > 0 ? inr(r2(pt * E.pctAll / 100)) : "—"}</span></b></span>
+     <button class="btn primary" id="edPctApply" ${n ? "" : "disabled"}>Apply to all lines</button>
+     <span class="note" style="flex-basis:100%">Every line gets this %, so the line amounts add up to the selling total (before any hospital or surgeon discount and GST). You can still change the % on any single line. Not printed.</span>`; })()}</div>` : ""}
    <div class="tablewrap" style="margin-top:10px;max-height:none"><table class="edtable">
      <thead><tr><th>#</th><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">QTY</th><th class="num">MRP</th>${E.type !== "PO" ? `<th class="num" title="Your purchase rate from the supplier invoice (not printed)">Purchase rate</th><th class="num" title="Selling price as % of the purchase rate">Sell %</th>` : ""}<th class="num">${E.type !== "PO" ? "Selling rate" : "Rate"}</th><th class="num">Disc %</th><th class="num">GST %</th><th class="num">Amount</th><th class="num">Total incl. GST</th><th>Remarks</th><th></th></tr></thead>
      <tbody>${E.lines.length ? E.lines.map((l, i) => { const c = calcLine(l, intra, O); const av = availFor(l.key); const over = T.deducts && !E.fromDc && l.qty > av;
@@ -229,7 +232,7 @@ function renderEditor() {
        <td class="num"><input type="number" min="1" step="1" data-l="qty" data-i="${i}" value="${l.qty}" style="width:64px;text-align:right;${over ? "border-color:var(--bad)" : ""}" ${l.serial ? "readonly" : ""} aria-label="Quantity line ${i + 1}"></td>
        <td class="num">${inr(l.mrp)}</td>
        ${E.type !== "PO" ? (() => { const uc = typeof lineCost === "function" ? lineCost(l) : 0; const sp = uc ? r2(l.rate / uc * 100) : 0;
-         return `<td class="num" style="background:var(--bg)">${uc ? inr(uc) : `<span class="note neg">no rate</span>`}</td><td class="num"><input type="number" min="0" step="0.01" data-l="sellPct" data-i="${i}" value="${uc && l.rate > 0 ? sp : ""}" placeholder="%" ${uc ? "" : "disabled"} style="width:70px;text-align:right;${!(l.rate > 0) ? "border-color:var(--warn,#d08700)" : ""}" aria-label="Selling percent line ${i + 1}">${l.rate > 0 ? `<div class="note">profit ${inr(r2(c.taxable - uc * l.qty))}</div>` : `<div class="note">enter %</div>`}</td>`; })() : ""}
+         return `<td class="num" style="background:var(--bg)">${uc ? `${inr(uc)}${l.qty > 1 ? `<div class="note">× ${l.qty} = ${inr(r2(uc * l.qty))}</div>` : ""}` : `<span class="note neg">no rate</span>`}</td><td class="num"><input type="number" min="0" step="0.01" data-l="sellPct" data-i="${i}" value="${uc && l.rate > 0 ? sp : ""}" placeholder="%" ${uc ? "" : "disabled"} style="width:70px;text-align:right;${!(l.rate > 0) ? "border-color:var(--warn,#d08700)" : ""}" aria-label="Selling percent line ${i + 1}">${l.rate > 0 ? `<div class="note">profit ${inr(r2(c.taxable - uc * l.qty))}</div>` : `<div class="note">enter %</div>`}</td>`; })() : ""}
        <td class="num"><input type="number" min="0" step="0.01" data-l="rate" data-i="${i}" value="${l.rate}" style="width:96px;text-align:right" aria-label="Rate line ${i + 1}"></td>
        <td class="num"><input type="number" min="0" max="100" step="0.01" data-l="discPct" data-i="${i}" value="${l.discPct}" style="width:64px;text-align:right" aria-label="Discount line ${i + 1}"></td>
        <td class="num">${inr(c.gstRate)}</td>
@@ -276,12 +279,13 @@ function salesInput(e) {
   if (t.id === "edRef") { E.yourRef = t.value; return; }
   if (t.id === "edCredit") { E.creditDays = t.value === "" ? "" : Math.max(0, Math.round(+t.value || 0)); return; }
   if (t.id === "edPrep") { E.preparedBy = t.value; return; }
-  if (t.id === "edPctAll") { E.pctAll = t.value === "" ? "" : Math.max(0, parseFloat(t.value) || 0); return; }
+  if (t.id === "edPctAll") { E.pctAll = t.value === "" ? "" : Math.max(0, parseFloat(t.value) || 0); const c = document.getElementById("edPctCalc"); if (c) c.textContent = E.pctAll > 0 ? inr(r2(edPurchaseTotal(E) * E.pctAll / 100)) : "—"; return; }
   if (t.id === "edProc" || t.id === "edSurg" || t.id === "edPat") { E.case = E.case || {}; E.case[{ edProc: "procedure", edSurg: "surgeon", edPat: "patient" }[t.id]] = t.value; return; }
   if (t.dataset.o && t.type === "number") { E.opts[t.dataset.o] = t.value === "" ? "" : (parseFloat(t.value) || 0); return; }
   if (t.dataset.l) { const l = E.lines[+t.dataset.i]; const k = t.dataset.l; l[k] = k === "remarks" ? t.value : (parseFloat(t.value) || 0); if (k === "qty") l.qty = Math.max(0, Math.round(l.qty));
     if (typeof lineCost === "function" && (k === "sellPct" || k === "rate")) { const uc = lineCost(l); if (k === "sellPct") { if (t.value === "") { l.sellPct = ""; l.rate = 0; } else if (uc) l.rate = r2(uc * l.sellPct / 100); } else l.sellPct = uc ? r2(l.rate / uc * 100) : 0; } }
 }
+function edPurchaseTotal(E) { return r2(E.lines.reduce((a, l) => a + (typeof lineCost === "function" ? lineCost(l) : 0) * (+l.qty || 0), 0)); }
 function salesChange(e) {
   const t = e.target; const E = S.ed;
   if (t.id === "sType" || t.id === "sStatus") return renderSalesList();
