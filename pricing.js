@@ -180,7 +180,7 @@ function renderProfit() {
   const G = profGroup(F, P.by); const q = P.q.trim().toLowerCase();
   const rows = G.filter(g => !q || (g.name + " " + (g.sub || "")).toLowerCase().includes(q));
   const show = rows.slice(0, 500);
-  const tile = (k, v, s, cls) => `<div class="tile6"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const tile = (k, v, s, cls) => `<div class="tile6"><div class="k">${k}${ib(k)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
   el.innerHTML = `<div class="panel pad"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px">
       <div><h2 style="margin:0">Profit</h2><div class="note">${esc(label)}${P.div ? " · " + esc(divName(P.div)) : " · all divisions"} · active tax invoices · sale value excludes GST · cost = purchase <b>Rate</b> × quantity</div></div>
       <button class="btn" id="pfXlsx">Download profit report (Excel)</button></div>

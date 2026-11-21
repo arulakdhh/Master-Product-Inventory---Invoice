@@ -122,7 +122,7 @@ function renderCashflow() {
   const peak = Math.max(1, ...rows.map(r => Math.max(r.billed, r.cin, r.cout)));
   const hgt = v => Math.max(v > 0 ? 2 : 0, Math.round(v / peak * 180));
   const tight = rows.filter(r => !r.past && r.net < 0);
-  const tile = (k, v, s, cls) => `<div class="tile6"><div class="k">${k}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
+  const tile = (k, v, s, cls) => `<div class="tile6"><div class="k">${k}${ib(k)}</div><div class="v ${cls || ""}">${v}</div><div class="s">${s}</div></div>`;
   const q = V.listQ.trim().toLowerCase(); const expList = EXP.filter(x => !q || (x.no + " " + x.cust).toLowerCase().includes(q));
   const supList = SUP.filter(b => V.supShow === "all" || !b.paid);
   const divs = S.divisions || [];
@@ -145,7 +145,7 @@ function renderCashflow() {
     ${tile("Net cash, next 30 days", (net30 >= 0 ? "+ ₹ " : "− ₹ ") + cfLakh(Math.abs(net30)), net30 >= 0 ? "more coming in than going out" : "more going out than coming in", net30 >= 0 ? "pos" : "neg")}
   </div>
   ${tight.length ? `<div class="msg warn">Tight month${tight.length > 1 ? "s" : ""}: ${tight.map(r => `<b>${monLbl(r.k)}</b> (₹ ${cfLakh(r.cin)} in, ₹ ${cfLakh(r.cout)} out)`).join(", ")}. Push collections from slow payers before then, or plan supplier payments around it.</div>` : ""}
-  <div class="panel pad"><h3 style="margin:0">Month by month</h3><div class="note">Past months are actual; this month and later are expected. Hover a bar for the amount.</div>
+  <div class="panel pad"><h3 style="margin:0">Month by month${ib("Month by month")}</h3><div class="note">Past months are actual; this month and later are expected. Hover a bar for the amount.</div>
     <div class="cfbars" role="img" aria-label="Billed, cash in and cash out by month">${rows.map(r => `<div class="cfm ${r.past ? "" : r.now ? "now" : "fut"}"><div class="bb">
       <div class="b" style="height:${hgt(r.billed)}px;background:#2a78d6" title="${monLbl(r.k)}: billed ₹ ${inr(r.billed, 0)}">${hgt(r.billed) >= 16 ? `<span>${cfShort(r.billed)}</span>` : ""}</div>
       <div class="b" style="height:${hgt(r.cin)}px;background:#1baf7a;${r.past ? "" : "opacity:.6"}" title="${monLbl(r.k)}: cash in ₹ ${inr(r.cin, 0)}${r.inExp ? ` (₹ ${inr(r.inExp, 0)} expected)` : ""}">${hgt(r.cin) >= 16 ? `<span>${cfShort(r.cin)}</span>` : ""}</div>
@@ -156,11 +156,11 @@ function renderCashflow() {
     ${rows.map(r => `<tr${r.now ? ' style="font-weight:700"' : ""}><td>${monLbl(r.k)}${r.past ? ' <span class="note">actual</span>' : r.now ? ' <span class="note">now</span>' : ' <span class="note">expected</span>'}</td><td class="num">${inr(r.billed, 0)}</td><td class="num">${inr(r.cin, 0)}${r.inExp && r.inAct ? `<div class="note">${inr(r.inAct, 0)} received + ${inr(r.inExp, 0)} expected</div>` : ""}</td><td class="num">${inr(r.cout, 0)}</td><td class="num ${r.net >= 0 ? "pos" : "neg"}">${inr(r.net, 0)}</td><td class="num">${r.past ? "" : inr(r.run, 0)}</td></tr>`).join("")}
     ${beyondIn > 0.5 ? `<tr><td colspan="6" class="note">₹ ${inr(beyondIn, 0)} more is expected after ${monLbl(months[months.length - 1])}.</td></tr>` : ""}
     </tbody></table></div></div>
-  <div class="panel"><div class="toolbar"><b>Expected from customers</b><input type="search" id="cfQ" placeholder="Search customer or invoice…" value="${esc(V.listQ)}"><span class="count">${expList.length} open · ₹ ${inr(expList.reduce((a, x) => a + x.bal, 0), 0)}</span></div>
+  <div class="panel"><div class="toolbar"><b>Expected from customers</b>${ib("Expected from customers")}<input type="search" id="cfQ" placeholder="Search customer or invoice…" value="${esc(V.listQ)}"><span class="count">${expList.length} open · ₹ ${inr(expList.reduce((a, x) => a + x.bal, 0), 0)}</span></div>
     <div class="tablewrap"><table><thead><tr><th>Expected</th><th>Customer</th><th>Invoice</th><th class="num">Invoice (₹)</th><th class="num">Still to come (₹)</th><th>Why this date</th></tr></thead><tbody>
     ${expList.length ? expList.slice(0, 300).map(x => `<tr class="${x.late ? "lowp" : ""}"><td>${x.late ? `<b class="neg">Overdue</b><div class="note">${x.lateBy} days past their usual time</div>` : dmy(x.exp)}</td><td>${esc(x.cust)} ${H[x.custId] ? ratePill(H[x.custId].rating) : ""}</td><td class="code">${esc(x.no)}<div class="note">${dmy(x.date)}</div></td><td class="num">${inr(x.grand)}</td><td class="num"><b>${inr(x.bal)}</b></td><td class="note">${esc(x.basis)}</td></tr>`).join("") : `<tr><td colspan="6" class="empty">Nothing outstanding. Every invoice is paid.</td></tr>`}
     </tbody></table></div></div>
-  <div class="panel"><div class="toolbar"><b>Supplier payments</b><select id="cfSupShow"><option value="unpaid" ${V.supShow === "unpaid" ? "selected" : ""}>Not paid yet</option><option value="all" ${V.supShow === "all" ? "selected" : ""}>All supplier invoices</option></select><span class="count">${supList.length} · ₹ ${inr(supList.reduce((a, b) => a + b.amt, 0), 0)}</span></div>
+  <div class="panel"><div class="toolbar"><b>Supplier payments</b>${ib("Supplier payments")}<select id="cfSupShow"><option value="unpaid" ${V.supShow === "unpaid" ? "selected" : ""}>Not paid yet</option><option value="all" ${V.supShow === "all" ? "selected" : ""}>All supplier invoices</option></select><span class="count">${supList.length} · ₹ ${inr(supList.reduce((a, b) => a + b.amt, 0), 0)}</span></div>
     <div class="tablewrap"><table><thead><tr><th>Due</th><th>Supplier invoice</th><th>Supplier</th><th>Division</th><th class="num">Amount incl. GST (₹)</th><th>Status</th></tr></thead><tbody>
     ${supList.length ? supList.map(b => { const od = !b.paid && b.due < today; return `<tr class="${od ? "lowp" : ""}"><td>${dmy(b.due)}<div class="note">${b.days} days credit</div></td><td class="code">${esc(b.no)}<div class="note">${dmy(b.date)}</div></td><td>${esc(b.supplier)}</td><td>${esc(b.div)}</td><td class="num">${inr(b.amt)}</td>
       <td>${b.paid ? `<span class="ratepill rate-f">Paid ${dmy(b.paidOn)}</span>${can ? ` <button class="btn" data-cfunpay="${esc(b.no)}" title="Mark as not paid">↺</button>` : ""}` : `${od ? `<span class="ratepill rate-s">${cfDays(b.due, today)}d overdue</span>` : `<span class="ratepill rate-m">Due in ${cfDays(today, b.due)}d</span>`}${can ? ` <button class="btn" data-cfpay="${esc(b.no)}">Mark paid</button>` : ""}`}</td></tr>`; }).join("") : `<tr><td colspan="6" class="empty">${V.supShow === "unpaid" ? "All supplier invoices are marked paid." : "No supplier invoices yet."}</td></tr>`}
@@ -218,13 +218,13 @@ function renderCycle() {
        <span>Stock held <b>${r0(T.stock)}</b> days</span><span>+</span>
        <span>Customers pay in <b>${r0(pay)}</b> days${T.pay == null ? ' <span class="note">(assumed, no receipts yet)</span>' : ""}</span><span>−</span>
        <span>Supplier credit <b>${r0(T.sup ?? S.cf.supDays.default)}</b> days</span><span>=</span>
-       <span style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 12px">Cash cycle <b class="${cyc != null && cyc > 0 ? "neg" : "pos"}">${r0(cyc)}</b> days</span></div>
+       <span style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px 12px">Cash cycle${ib("Cash cycle")} <b class="${cyc != null && cyc > 0 ? "neg" : "pos"}">${r0(cyc)}</b> days</span></div>
      <p style="margin:10px 0 0">${plain}</p></div>
   <div class="tiles6">
-    <div class="tile6"><div class="k">Fast payers</div><div class="v">${cnt("f")}</div><div class="s">pay within 30 days</div></div>
-    <div class="tile6"><div class="k">Medium payers</div><div class="v">${cnt("m")}</div><div class="s">31–60 days</div></div>
-    <div class="tile6"><div class="k">Slow payers</div><div class="v ${cnt("s") ? "neg" : ""}">${cnt("s")}</div><div class="s">over 60 days</div></div>
-    <div class="tile6"><div class="k">No payment yet</div><div class="v">${cnt("n")}</div><div class="s">customers with no receipts</div></div>
+    <div class="tile6"><div class="k">Fast payers${ib("Fast payers")}</div><div class="v">${cnt("f")}</div><div class="s">pay within 30 days</div></div>
+    <div class="tile6"><div class="k">Medium payers${ib("Medium payers")}</div><div class="v">${cnt("m")}</div><div class="s">31–60 days</div></div>
+    <div class="tile6"><div class="k">Slow payers${ib("Slow payers")}</div><div class="v ${cnt("s") ? "neg" : ""}">${cnt("s")}</div><div class="s">over 60 days</div></div>
+    <div class="tile6"><div class="k">No payment yet${ib("No payment yet")}</div><div class="v">${cnt("n")}</div><div class="s">customers with no receipts</div></div>
   </div>
   <div class="panel"><div class="toolbar"><span class="seg" role="group" aria-label="View">${[["customer", "Customers"], ["division", "Company / division"], ["product", "Products"]].map(([k, l]) => `<button data-cyby="${k}" class="${V.by === k ? "on" : ""}">${l}</button>`).join("")}</span>
     ${V.by !== "division" ? `<input type="search" id="cyQ" placeholder="Search…" value="${esc(V.q)}">` : ""}</div>

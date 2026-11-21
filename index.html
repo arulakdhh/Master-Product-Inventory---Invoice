@@ -313,6 +313,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <script src="parser.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script src="help.js?v=1"></script>
 <script>
 "use strict";
 /* ---------- field definitions ---------- */
@@ -487,7 +488,7 @@ function renderPid(){
       cards.appendChild(c); }
     const L=S.items.filter(r=>r.divCode===d.code); const inv=Object.values(S.registry).filter(g=>g.division===d.code).map(g=>g.invoiceNo).filter(no=>S.invoices[no]);
     const n=S.counters[d.code]||0;
-    c.querySelector(".divstats").innerHTML=`<div><div class="k">Invoices</div><div class="v">${inr(inv.length,0)}</div></div><div><div class="k">PIDs issued</div><div class="v">${inr(n,0)}</div></div><div><div class="k">Next PID</div><div class="v">${esc(fmtId(d.code,n+1))}</div></div>`;
+    c.querySelector(".divstats").innerHTML=`<div><div class="k">Invoices${ib("Invoices")}</div><div class="v">${inr(inv.length,0)}</div></div><div><div class="k">PIDs issued${ib("PIDs issued")}</div><div class="v">${inr(n,0)}</div></div><div><div class="k">Next PID${ib("Next PID")}</div><div class="v">${esc(fmtId(d.code,n+1))}</div></div>`;
     c.querySelector(".drop").classList.toggle("hidden",!S.canWrite||!S.db);
     c.querySelector(".divinv").innerHTML= inv.length? inv.sort().map(no=>{ const LL=L.filter(r=>r.invoiceNo===no&&r.dhhId).map(r=>r.dhhId); return `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:6px"><span><b>${esc(no)}</b> · ${inr(L.filter(r=>r.invoiceNo===no).length,0)} lines · ${LL.length?esc(LL[0])+" … "+esc(LL[LL.length-1]):"no PIDs"}</span>${S.canWrite?`<button class="btn danger" data-del="${esc(no)}">Delete invoice</button>`:""}</div>`; }).join("") : "No invoices yet.";
   }
@@ -907,11 +908,11 @@ render();
 </script>
 <script src="sales.js?v=17"></script>
 <script src="ops.js?v=3"></script>
-<script src="analytics.js?v=3"></script>
+<script src="analytics.js?v=4"></script>
 <script src="studio.js?v=1"></script>
-<script src="pricing.js?v=5"></script>
-<script src="cashflow.js?v=1"></script>
-<script src="groups.js?v=2"></script>
+<script src="pricing.js?v=6"></script>
+<script src="cashflow.js?v=2"></script>
+<script src="groups.js?v=3"></script>
 <script src="field-link.js?v=1"></script>
 <script>
 /* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */

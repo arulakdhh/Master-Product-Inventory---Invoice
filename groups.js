@@ -123,10 +123,10 @@ function renderGroups() {
      <div id="gMsg" class="${F.note ? "msg ok" : "hidden"}" style="margin-top:8px">${esc(F.note || "")}</div>
      ${unnamed && can ? `<div class="note" style="margin-top:6px">${unnamed} group name${unnamed === 1 ? " was" : "s were"} suggested automatically. Check them and press Save names to keep them.</div>` : ""}</div>
   <div class="tiles6">
-    <div class="tile6"><div class="k">Categories</div><div class="v">${Object.keys(byCat).length}</div><div class="s">${esc(Object.keys(byCat).slice(0, 4).join(", "))}${Object.keys(byCat).length > 4 ? " …" : ""}</div></div>
-    <div class="tile6"><div class="k">Product groups</div><div class="v">${inr(T.groups, 0)}</div><div class="s">${inr(T.sizes, 0)} sizes / codes</div></div>
-    <div class="tile6"><div class="k">In stock</div><div class="v">${inr(T.stock, 0)} pcs</div><div class="s">₹ ${inr(T.val, 0)} at purchase rate</div></div>
-    <div class="tile6"><div class="k">Sold (tax invoices)</div><div class="v">₹ ${inr(T.sale, 0)}</div><div class="s">profit ₹ ${inr(T.profit, 0)}</div></div>
+    <div class="tile6"><div class="k">Categories${ib("Categories")}</div><div class="v">${Object.keys(byCat).length}</div><div class="s">${esc(Object.keys(byCat).slice(0, 4).join(", "))}${Object.keys(byCat).length > 4 ? " …" : ""}</div></div>
+    <div class="tile6"><div class="k">Product groups${ib("Product groups")}</div><div class="v">${inr(T.groups, 0)}</div><div class="s">${inr(T.sizes, 0)} sizes / codes</div></div>
+    <div class="tile6"><div class="k">In stock${ib("In stock")}</div><div class="v">${inr(T.stock, 0)} pcs</div><div class="s">₹ ${inr(T.val, 0)} at purchase rate</div></div>
+    <div class="tile6"><div class="k">Sold (tax invoices)${ib("Sold (tax invoices)")}</div><div class="v">₹ ${inr(T.sale, 0)}</div><div class="s">profit ₹ ${inr(T.profit, 0)}</div></div>
   </div>
   <div class="panel"><div class="toolbar">
     <input type="search" id="gQ" placeholder="Search group, code, product, PID or batch…" value="${esc(F.q)}">
