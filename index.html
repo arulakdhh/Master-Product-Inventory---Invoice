@@ -32,6 +32,10 @@ header.app{background:var(--surface);border-bottom:1px solid var(--line);padding
 .titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
 h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px}
+.themesw{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface);align-self:center}
+.themesw button{border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer;display:flex;gap:5px;align-items:center}
+.themesw button[aria-pressed="true"]{background:var(--accent);color:#fff}:root[data-theme="dark"] .themesw button[aria-pressed="true"]{color:#062326}
+.themesw button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .status{margin-left:auto;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
 .dot.ok{background:var(--good)}.dot.err{background:var(--bad)}
@@ -83,7 +87,7 @@ main>*,.grid2>*,main section>*{min-width:0}
 .pad{padding:14px 16px}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
 .toolbar input[type=search]{flex:1 1 220px;min-width:160px}
-input[type=search],input[type=text],select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+input[type=search],input[type=text],input:not([type]),input[type=number],input[type=date],input[type=email],input[type=tel],input[type=password],select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;white-space:nowrap}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -158,6 +162,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
     <h1>Implant Product Register</h1>
     <span class="sub" id="subline">Product lines from supplier invoices</span>
     <span class="status"><span class="dot" id="dbdot"></span><span id="dbstatus">Connecting to database…</span></span>
+    <div class="themesw" role="group" aria-label="Colour theme"><button type="button" data-theme-set="light" aria-pressed="false" title="Light theme">☀ Light</button><button type="button" data-theme-set="dark" aria-pressed="false" title="Dark theme">☾ Dark</button></div>
   </div>
   <nav class="tabs" role="tablist" id="panelnav" aria-label="Panels"></nav>
   <nav class="subtabs" id="subnav" aria-label="Sections"></nav>
@@ -569,8 +574,37 @@ async function handleFile(f, div, pv){
     parsed.sourceFile=f.name; parsed.div=div; S.pending=parsed; showPreview(pv);
   }catch(e){ console.error(e); pv.innerHTML=`<div class="msg bad">Couldn't read ${esc(f.name)}: ${esc(e.message||e)}. Use a PDF in the same supplier format, or the Excel file made earlier.</div>`; }
 }
+/* "Invoice Master" workbook: Invoice Summary (one row per invoice) + Invoice Lines (one row per item).
+   It can hold many invoices; each upload takes the first one that isn't in the register yet. */
+function parseMasterBook(wb){
+  const rowsOf=n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""});
+  const L=rowsOf("Invoice Lines"); const hi=L.findIndex(r=>r.some(c=>/^\s*item code\s*$/i.test(String(c)))); if(hi<0) throw new Error("Invoice Lines sheet: no 'Item Code' header found");
+  const H=L[hi].map(c=>String(c).toLowerCase().trim()); const c=(...n)=>H.findIndex(h=>n.some(x=>h===x)); const cs=(...n)=>H.findIndex(h=>n.some(x=>h.startsWith(x)));
+  const ix={inv:c("invoice no"),date:c("invoice date"),sup:c("supplier name"),cust:c("customer name"),sr:c("line no"),hsn:cs("hsn"),mat:c("item code"),name:c("product name"),fam:c("product family"),cat:c("category"),printed:cs("description"),batch:cs("batch"),serial:cs("serial"),exp:cs("expiry"),uom:c("uom"),qty:c("qty"),mrp:c("mrp"),rate:c("rate"),gross:c("gross amount"),disc:c("discount"),other:c("other charges"),taxable:c("taxable value"),cgr:c("cgst %"),cga:c("cgst amt"),sgr:c("sgst %"),sga:c("sgst amt"),igr:c("igst %"),iga:c("igst amt")};
+  const num=v=>v===""||v==null?0:(typeof v==="number"?v:parseFloat(String(v).replace(/,/g,""))||0);
+  const pct=v=>{const x=num(v);return x>0&&x<=1?Math.round(x*10000)/100:x;};
+  const d2=v=>{ if(v instanceof Date){ v=new Date(v.getTime()+12*3600e3); return [v.getUTCDate(),v.getUTCMonth()+1,v.getUTCFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); } if(false) return [v.getDate(),v.getMonth()+1,v.getFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); return String(v||"").trim(); };
+  const g=(r,k)=>ix[k]>=0?r[ix[k]]:"";
+  const all=L.slice(hi+1).filter(r=>String(g(r,"mat")).trim()&&String(g(r,"inv")).trim());
+  const invNos=[...new Set(all.map(r=>String(g(r,"inv")).trim()))];
+  if(!invNos.length) throw new Error("Invoice Lines sheet has no item rows");
+  const clean=n=>n.replace(/[^A-Za-z0-9_\-.]+/g,"-");
+  const pick=invNos.find(n=>!S.invoices[clean(n)])||invNos[0];
+  const R=all.filter(r=>String(g(r,"inv")).trim()===pick);
+  const rows=R.map((r,i)=>({sr:parseInt(g(r,"sr"))||i+1,hsn:String(g(r,"hsn")),mat:String(g(r,"mat")).trim(),desc:String(g(r,"name")||g(r,"printed")).trim(),printedDesc:String(g(r,"printed")||""),family:String(g(r,"fam")||""),category:String(g(r,"cat")||""),
+    batch:String(g(r,"batch")||""),serial:String(g(r,"serial")||""),exp:d2(g(r,"exp")),uom:String(g(r,"uom")||""),qty:num(g(r,"qty")),mrp:num(g(r,"mrp")),rate:num(g(r,"rate")),basic:num(g(r,"gross")),disc:num(g(r,"disc")),freight:num(g(r,"other")),taxable:num(g(r,"taxable")),
+    igstRate:pct(g(r,"igr"))+pct(g(r,"cgr"))+pct(g(r,"sgr")),igst:Math.round((num(g(r,"iga"))+num(g(r,"cga"))+num(g(r,"sga")))*100)/100}));
+  const r0=R[0]; const head={invoiceNo:clean(pick),invoiceDate:d2(g(r0,"date")),supplier:String(g(r0,"sup")||""),buyer:String(g(r0,"cust")||""),invoiceValue:null};
+  let footer=null;
+  if(wb.Sheets["Invoice Summary"]){ const Sm=rowsOf("Invoice Summary"); const sh=Sm.findIndex(r=>r.some(x=>/^\s*invoice no\s*$/i.test(String(x))));
+    if(sh>=0){ const SH=Sm[sh].map(x=>String(x).toLowerCase().trim()); const sc=n=>SH.indexOf(n); const sr=Sm.slice(sh+1).find(r=>String(r[sc("invoice no")]).trim()===pick);
+      if(sr){ const v=k=>sc(k)>=0?num(sr[sc(k)]):0; footer={basic:v("gross amount"),disc:v("discount"),taxable:v("taxable value"),igst:Math.round((v("igst")+v("cgst")+v("sgst"))*100)/100}; head.invoiceValue=v("invoice value (as printed)")||null; } } }
+  if(invNos.length>1) head.note=`This file has ${invNos.length} invoices (${invNos.join(", ")}). Showing ${pick}${S.invoices[clean(pick)]?"":" — the first one not yet in the register"}. After saving it, upload the same file again for the next one.`;
+  return {head,rows,footer};
+}
 function parseSheet(buf,name){
   const wb=XLSX.read(buf,{type:"array",cellDates:true});
+  if(wb.Sheets["Invoice Lines"]) return parseMasterBook(wb);
   const ws=wb.Sheets["Invoice Items"]||wb.Sheets[wb.SheetNames[0]];
   const A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
   const hi=A.findIndex(r=>r.some(c=>/^\s*material code\s*$/i.test(String(c)))); if(hi<0) throw new Error("no 'Material Code' header row found");
@@ -578,7 +612,7 @@ function parseSheet(buf,name){
   const col=(...names)=>H.findIndex(h=>names.some(n=>h.startsWith(n)));
   const ix={sr:col("sr"),hsn:col("hsn"),mat:col("material code"),desc:col("description"),batch:col("batch"),serial:col("serial"),exp:col("expiry"),uom:col("uom"),qty:col("qty"),mrp:col("mrp"),rate:col("rate"),basic:col("basic"),disc:col("discount amount","discount"),freight:col("freight"),taxable:col("taxable"),igstRate:col("igst rate"),igst:col("igst amount")};
   const num=v=>v===""?0:parseFloat(String(v).replace(/,/g,"").replace(/-$/,""));
-  const dstr=v=>{ if(v instanceof Date) return [v.getDate(),v.getMonth()+1,v.getFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); return String(v||"").trim(); };
+  const dstr=v=>{ if(v instanceof Date){ v=new Date(v.getTime()+12*3600e3); return [v.getUTCDate(),v.getUTCMonth()+1,v.getUTCFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); } if(false) return [v.getDate(),v.getMonth()+1,v.getFullYear()].map((x,i)=>String(x).padStart(i<2?2:4,"0")).join("."); return String(v||"").trim(); };
   const rows=[];
   for(const r of A.slice(hi+1)){ const mat=String(r[ix.mat]||"").trim(); if(!mat||!/\d/.test(String(r[ix.sr]))) continue;
     rows.push({sr:parseInt(r[ix.sr]),hsn:String(r[ix.hsn]),mat,desc:String(r[ix.desc]),batch:String(r[ix.batch]||""),serial:ix.serial>=0?String(r[ix.serial]||""):"",exp:dstr(r[ix.exp]),uom:String(r[ix.uom]),qty:num(r[ix.qty]),mrp:num(r[ix.mrp]),rate:num(r[ix.rate]),basic:num(r[ix.basic]),disc:num(r[ix.disc]),freight:ix.freight>=0?num(r[ix.freight]):0,taxable:num(r[ix.taxable]),igstRate:num(r[ix.igstRate]),igst:num(r[ix.igst])}); }
@@ -594,7 +628,7 @@ function showPreview(pv){
   const t={basic:r2(R.reduce((a,r)=>a+r.basic,0)),disc:r2(R.reduce((a,r)=>a+r.disc,0)),taxable:r2(R.reduce((a,r)=>a+r.taxable,0)),igst:r2(R.reduce((a,r)=>a+r.igst,0))};
   const ok=totalsOk(t,p.footer); const seq=R.every((r,i)=>r.sr===i+1);
   const exists=!!S.invoices[p.head.invoiceNo];
-  pv.innerHTML=`
+  pv.innerHTML=`${p.head.note?`<div class="msg warn">${esc(p.head.note)}</div>`:""}
    <div class="${R.length?(ok===false||!seq?"msg bad":ok?"msg good":"msg warn"):"msg bad"}">${R.length?`Found ${inr(R.length,0)} product lines. `+(ok?"The totals match the totals printed on the invoice.":ok===false?"The totals do NOT match the printed totals. Check the file before saving.":"No printed totals were found to check against.")+(seq?"":" Line numbers are not continuous."):"No product lines found in this file."}</div>
    <dl class="kv">
      <dt><label for="pInv">Invoice No.</label></dt><dd><input type="text" id="pInv" class="pInv" value="${esc(p.head.invoiceNo)}"></dd>
@@ -871,12 +905,26 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=16"></script>
+<script src="sales.js?v=17"></script>
 <script src="ops.js?v=3"></script>
 <script src="analytics.js?v=3"></script>
 <script src="studio.js?v=1"></script>
-<script src="pricing.js?v=4"></script>
+<script src="pricing.js?v=5"></script>
 <script src="cashflow.js?v=1"></script>
+<script src="groups.js?v=2"></script>
 <script src="field-link.js?v=1"></script>
+<script>
+/* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */
+(function(){
+  const sys=()=>window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+  let saved=null; try{ saved=localStorage.getItem("ipr-theme"); }catch(e){}
+  const apply=(t,redraw)=>{ document.documentElement.setAttribute("data-theme",t);
+    document.querySelectorAll("[data-theme-set]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.themeSet===t)));
+    if(redraw){ try{ if(typeof renderOps==="function"&&renderOps()) return; }catch(e){} try{ if(typeof render==="function") render(); }catch(e){} } };
+  apply(saved||sys(),false);
+  document.addEventListener("click",e=>{ const b=e.target.closest("[data-theme-set]"); if(!b) return; const t=b.dataset.themeSet; try{ localStorage.setItem("ipr-theme",t); }catch(e){} apply(t,true); });
+  if(window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{ let s=null; try{ s=localStorage.getItem("ipr-theme"); }catch(e){} if(!s) apply(sys(),true); });
+})();
+</script>
 </body>
 </html>

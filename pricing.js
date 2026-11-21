@@ -149,15 +149,15 @@ function profFacts() {
       const it = itemByKey.get(l.key) || {}; const dv = it.divCode || ""; if (div && dv !== div) return;
       const sale = r2(l.taxable != null ? l.taxable : calcLine(l, intra, d.opts).taxable);
       const unit = lineCost(l); const cost = r2(unit * (+l.qty || 0)); const disc = r2((l.disc || 0) + (l.hospDisc || 0) + (l.surgDisc || 0));
-      out.push({ invId: id, no: d.no, date: d.date, month: d.date.slice(0, 7), customer: (d.customer && d.customer.name) || "", procedure: cs.procedure || "", surgeon: cs.surgeon || "", patient: cs.patient || "", line: i + 1, pid: l.pid || "", mat: l.mat || "", desc: l.desc || "", div: dv, qty: +l.qty || 0, unitCost: unit, rate: +l.rate || 0, sale, disc, cost, profit: r2(sale - cost), target: pricingPct(l.mat, dv), sellPct: l.sellPct, noCost: !unit });
+      out.push({ invId: id, no: d.no, date: d.date, month: d.date.slice(0, 7), customer: (d.customer && d.customer.name) || "", procedure: cs.procedure || "", surgeon: cs.surgeon || "", patient: cs.patient || "", grp: typeof grpOf === "function" ? grpOf(it.mat ? it : l).name || l.desc : "", cat: typeof grpOf === "function" ? grpOf(it.mat ? it : l).cat || "Other" : "", line: i + 1, pid: l.pid || "", mat: l.mat || "", desc: l.desc || "", div: dv, qty: +l.qty || 0, unitCost: unit, rate: +l.rate || 0, sale, disc, cost, profit: r2(sale - cost), target: pricingPct(l.mat, dv), sellPct: l.sellPct, noCost: !unit });
     });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.no < b.no ? 1 : -1));
 }
-const PROF_BY = { invoice: "Invoice", procedure: "Procedure", surgeon: "Surgeon", line: "Each instrument", product: "Product", customer: "Customer", div: "Division", month: "Month" };
+const PROF_BY = { invoice: "Invoice", procedure: "Procedure", surgeon: "Surgeon", line: "Each instrument", cat: "Category", grp: "Product group", product: "Product", customer: "Customer", div: "Division", month: "Month" };
 function profGroup(F, by) {
   if (by === "line") return F.map(x => ({ key: x.invId + "#" + x.line, name: x.desc, sub: `${x.pid || x.mat} · ${x.no} · ${dmy(x.date)}${x.procedure ? " · " + x.procedure : ""} · bought ₹${inr(x.unitCost)} → sold ₹${inr(x.qty ? x.sale / x.qty : 0)}`, qty: x.qty, sale: x.sale, cost: x.cost, profit: x.profit, disc: x.disc, n: 1, target: x.target, noCost: x.noCost }));
-  const kf = { invoice: x => x.invId, procedure: x => x.procedure || "(no procedure entered)", surgeon: x => x.surgeon || "(no surgeon entered)", product: x => x.mat, customer: x => x.customer || "—", div: x => x.div || "—", month: x => x.month }[by];
+  const kf = { invoice: x => x.invId, procedure: x => x.procedure || "(no procedure entered)", surgeon: x => x.surgeon || "(no surgeon entered)", cat: x => x.cat || "Other", grp: x => x.grp || x.desc, product: x => x.mat, customer: x => x.customer || "—", div: x => x.div || "—", month: x => x.month }[by];
   const m = new Map();
   for (const x of F) { const k = kf(x); let g = m.get(k);
     if (!g) { g = { key: k, qty: 0, sale: 0, cost: 0, profit: 0, disc: 0, n: 0, inv: new Set(), tgtW: 0, noCost: 0,
@@ -220,9 +220,9 @@ function renderProfit() {
     const pctv = (a, b) => b ? r2(a / b * 100) : "";
     const head = ["Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin % (on sale)", "Profit % on purchase", "Discounts (₹)"];
     const sheet = by => { const g = profGroup(F, by); return [[PROF_BY[by], "Detail", "Invoices", "Qty", ...head], ...g.map(x => [x.name, x.sub || "", x.invoices || 1, x.qty, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), pctv(x.profit, x.cost), x.disc])]; };
-    const lines = [["Invoice no.", "Date", "Customer", "Procedure", "Surgeon", "Patient / IP no.", "Line", "PID", "Material code", "Description", "Division", "Qty", "Purchase rate (₹)", "Selling rate (₹)", "Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sell % entered (added on purchase)", "Profit % on purchase (after discounts)", "Discounts (₹)"],
-      ...F.map(x => [x.no, dmy(x.date), x.customer, x.procedure, x.surgeon, x.patient, x.line, x.pid, x.mat, x.desc, x.div, x.qty, x.unitCost, x.rate, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), x.sellPct === "" || x.sellPct == null ? "" : x.sellPct, pctv(x.profit, x.cost), x.disc])];
+    const lines = [["Invoice no.", "Date", "Customer", "Procedure", "Surgeon", "Patient / IP no.", "Category", "Product group", "Line", "PID", "Material code", "Description", "Division", "Qty", "Purchase rate (₹)", "Selling rate (₹)", "Sales value (₹)", "Purchase cost (₹)", "Profit (₹)", "Margin %", "Sell % entered (added on purchase)", "Profit % on purchase (after discounts)", "Discounts (₹)"],
+      ...F.map(x => [x.no, dmy(x.date), x.customer, x.procedure, x.surgeon, x.patient, x.cat, x.grp, x.line, x.pid, x.mat, x.desc, x.div, x.qty, x.unitCost, x.rate, x.sale, x.cost, x.profit, pctv(x.profit, x.sale), x.sellPct === "" || x.sellPct == null ? "" : x.sellPct, pctv(x.profit, x.cost), x.disc])];
     const sum = [["Profit report", label + (P.div ? " · " + divName(P.div) : " · all divisions")], [], ["Sales value excl. GST (₹)", T.sale], ["Purchase cost at Rate (₹)", T.cost], ["Profit (₹)", T.profit], ["Margin % (on sale)", pctv(T.profit, T.sale)], ["Profit % on purchase", pctv(T.profit, T.cost)], ["Discounts given (₹)", T.disc], ["Invoices", invs], ["Units", T.qty]];
-    await save(`Profit_report_${todayIso()}.xlsx`, xlsxFrom([["Summary", sum], ["By invoice", sheet("invoice")], ["By procedure", sheet("procedure")], ["By surgeon", sheet("surgeon")], ["Each instrument", lines], ["By product", sheet("product")], ["By customer", sheet("customer")], ["By division", sheet("div")], ["By month", sheet("month")]]));
+    await save(`Profit_report_${todayIso()}.xlsx`, xlsxFrom([["Summary", sum], ["By invoice", sheet("invoice")], ["By procedure", sheet("procedure")], ["By surgeon", sheet("surgeon")], ["By category", sheet("cat")], ["By product group", sheet("grp")], ["Each instrument", lines], ["By product", sheet("product")], ["By customer", sheet("customer")], ["By division", sheet("div")], ["By month", sheet("month")]]));
   };
 }

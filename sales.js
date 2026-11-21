@@ -260,9 +260,9 @@ function renderPick() {
   const q = ($("pick")?.value || "").trim().toLowerCase(); S._pickq = q; const out = $("pickres"); if (!out) return;
   if (!q) { out.innerHTML = ""; return; }
   const m = soldMap(S.ed.editingId);
-  const res = S.items.filter(r => r2(r.qty - (m[r.key] || 0)) > 0 && q.split(/\s+/).every(w => [r.dhhId, r.mat, r.desc, r.batch, r.serial, r.hsn].join(" ").toLowerCase().includes(w)))
+  const res = S.items.filter(r => r2(r.qty - (m[r.key] || 0)) > 0 && q.split(/\s+/).every(w => [r.dhhId, r.mat, r.desc, r.batch, r.serial, r.hsn, r.grpName || "", r.grpCat || ""].join(" ").toLowerCase().includes(w)))
     .sort((a, b) => (toDate(a.exp)?.getTime() ?? Infinity) - (toDate(b.exp)?.getTime() ?? Infinity)).slice(0, 25);
-  out.innerHTML = res.length ? `<div class="tablewrap" style="max-height:260px"><table><thead><tr><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">MRP</th><th></th></tr></thead><tbody>${res.map(r => `<tr><td class="dhh">${esc(r.dhhId || "—")}</td><td class="desc">${esc(r.desc)}<div class="note">${esc(r.mat)}</div></td><td class="code">${esc(r.batch)}${r.serial ? "<br>" + esc(r.serial) : ""}</td><td>${esc(r.exp)}</td><td class="num">${inr(r2(r.qty - (m[r.key] || 0)), 0)}</td><td class="num">${inr(r.mrp)}</td><td><button class="btn" data-add="${esc(r.key)}">Add</button></td></tr>`).join("")}</tbody></table></div>`
+  out.innerHTML = res.length ? `<div class="tablewrap" style="max-height:260px"><table><thead><tr><th>PID</th><th>Description</th><th>Batch / Serial</th><th>Expiry</th><th class="num">Avail.</th><th class="num">MRP</th><th></th></tr></thead><tbody>${res.map(r => `<tr><td class="dhh">${esc(r.dhhId || "—")}</td><td class="desc">${esc(r.desc)}<div class="note">${esc(r.mat)}${r.grpName ? " · " + esc(r.grpName) : ""}</div></td><td class="code">${esc(r.batch)}${r.serial ? "<br>" + esc(r.serial) : ""}</td><td>${esc(r.exp)}</td><td class="num">${inr(r2(r.qty - (m[r.key] || 0)), 0)}</td><td class="num">${inr(r.mrp)}</td><td><button class="btn" data-add="${esc(r.key)}">Add</button></td></tr>`).join("")}</tbody></table></div>`
     : `<div class="note">No in-stock product matches "${esc(q)}".</div>`;
 }
 
