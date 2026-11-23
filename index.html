@@ -32,6 +32,7 @@ header.app{background:var(--surface);border-bottom:1px solid var(--line);padding
 .titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
 h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px}
+.pv span.good{color:#17663a}.pv span.bad{color:var(--bad,#b42318)}.pv span.warn{color:#8a5a00}:root[data-theme="dark"] .pv span.good{color:#4ade80}:root[data-theme="dark"] .pv span.warn{color:#facc15}
 .themesw{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface);align-self:center}
 .themesw button{border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer;display:flex;gap:5px;align-items:center}
 .themesw button[aria-pressed="true"]{background:var(--accent);color:#fff}:root[data-theme="dark"] .themesw button[aria-pressed="true"]{color:#062326}
@@ -478,13 +479,13 @@ function renderPid(){
     let c=cards.querySelector(`[data-divcard="${d.code}"]`);
     if(!c){ c=document.createElement("div"); c.className="divcard"; c.dataset.divcard=d.code; c.style.setProperty("--dc",DIVCOLORS[d.code]||"var(--accent)");
       c.innerHTML=`<h2><span class="divtag">${esc(d.code)}</span>${esc(d.name)}</h2><div class="divstats"></div>
-        <div class="drop" tabindex="0" role="button" aria-label="Upload ${esc(d.name)} invoice">Drop a <b>${esc(d.name)}</b> invoice here, or click to choose (PDF or Excel)<input type="file" accept=".pdf,.xlsx,.xls" hidden></div>
+        <div class="drop" tabindex="0" role="button" aria-label="Upload ${esc(d.name)} invoice">Drop <b>${esc(d.name)}</b> invoices here, or click to choose (PDF or Excel, one or many files)<input type="file" accept=".pdf,.xlsx,.xls" multiple hidden></div>
         <div class="pv hidden" style="display:grid;gap:10px"></div><div class="divinv note"></div>`;
       const drop=c.querySelector(".drop"), inp=c.querySelector("input[type=file]"), pv=c.querySelector(".pv");
       drop.onclick=()=>inp.click(); drop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();inp.click();} };
-      inp.onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0], d.code, pv); e.target.value=""; };
+      inp.onchange=e=>{ const F=[...e.target.files]; if(F.length>1) handleFiles(F, d.code, pv); else if(F[0]) handleFile(F[0], d.code, pv); e.target.value=""; };
       drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");}; drop.ondragleave=()=>drop.classList.remove("over");
-      drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over"); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0], d.code, pv);};
+      drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over"); const F=[...e.dataTransfer.files].filter(f=>/\.(pdf|xlsx|xls)$/i.test(f.name)); if(F.length>1) handleFiles(F, d.code, pv); else if(F[0]) handleFile(F[0], d.code, pv);};
       cards.appendChild(c); }
     const L=S.items.filter(r=>r.divCode===d.code); const inv=Object.values(S.registry).filter(g=>g.division===d.code).map(g=>g.invoiceNo).filter(no=>S.invoices[no]);
     const n=S.counters[d.code]||0;
@@ -564,15 +565,59 @@ function renderInvoices(){
 }
 
 /* ---------- import ---------- */
+const cleanInvNo=n=>String(n||"").trim().replace(/[^A-Za-z0-9_\-.]+/g,"-").replace(/^-+|-+$/g,"");
+async function readInvoiceFile(f){
+  const buf=new Uint8Array(await f.arrayBuffer()); let parsed;
+  if(/\.pdf$/i.test(f.name)){ pdfjsLib.GlobalWorkerOptions.workerSrc="pdf.worker.min.js"; parsed=parseInvoiceLines(await pdfToLines(pdfjsLib, buf)); }
+  else parsed=parseSheet(buf, f.name);
+  parsed.sourceFile=f.name; parsed.head.invoiceNo=cleanInvNo(parsed.head.invoiceNo); return parsed;
+}
+/* Many files at once: read all → checklist (totals check, new or already in) → save the ticked ones, oldest first */
+async function handleFiles(files, div, pv){
+  if(S.batch&&S.batch.busy){ const n=document.getElementById("bNote"); if(n) n.textContent="Still saving the previous files — drop the new ones when this finishes."; return; }
+  pv.classList.remove("hidden"); const B={div, items:[]}; S.batch=B; const card=pv.closest("[data-divcard]"); if(card) card.style.gridColumn="1 / -1";
+  pv.innerHTML=`<div class="msg warn">Reading ${files.length} files…</div>`;
+  for(const [i,f] of files.entries()){
+    pv.querySelector(".msg").textContent=`Reading ${i+1} of ${files.length}: ${f.name}…`;
+    const it={file:f.name};
+    try{ const p=await readInvoiceFile(f); p.div=div; const R=p.rows;
+      const t={basic:r2(R.reduce((a,r)=>a+r.basic,0)),disc:r2(R.reduce((a,r)=>a+r.disc,0)),taxable:r2(R.reduce((a,r)=>a+r.taxable,0)),igst:r2(R.reduce((a,r)=>a+r.igst,0))};
+      Object.assign(it,{p,t,ok:totalsOk(t,p.footer),seq:R.every((r,k)=>r.sr===k+1),no:p.head.invoiceNo,date:p.head.invoiceDate,lines:R.length,value:p.head.invoiceValue??r2(t.taxable+t.igst)});
+      it.exists=!!S.invoices[it.no]; it.problem=!R.length?"no product lines found":!it.no?"no invoice number":it.ok===false?"totals don't match the printed totals":!it.seq?"line numbers are not in order":"";
+      if(!it.problem&&B.items.some(x=>x.no===it.no)) it.problem="same invoice number as another file";
+      it.pick=!it.problem&&!it.exists;
+    }catch(e){ it.problem="couldn't read: "+(e.message||e); it.pick=false; }
+    B.items.push(it);
+  }
+  const key=d=>{ const m=String(d||"").match(/(\d{2})\.(\d{2})\.(\d{4})/); return m?m[3]+m[2]+m[1]:"99999999"; };
+  B.items.sort((a,b)=>key(a.date)<key(b.date)?-1:key(a.date)>key(b.date)?1:String(a.no||a.file).localeCompare(String(b.no||b.file)));
+  renderBatch(pv);
+}
+function renderBatch(pv){
+  const B=S.batch; if(!B) return; const n=B.items.filter(x=>x.pick).length, bad=B.items.filter(x=>x.problem).length, old=B.items.filter(x=>x.exists&&!x.problem).length;
+  const st=x=>x.done?`<span class="good">✓ ${esc(x.done)}</span>`:x.err?`<span class="bad">✗ ${esc(x.err)}</span>`:x.problem?`<span class="bad">✗ ${esc(x.problem)}</span>`:x.exists?`<span class="warn">Already in the register — tick to replace its lines (PIDs stay)</span>`:x.ok?`<span class="good">✓ Totals match the printed invoice</span>`:`<span class="warn">No printed totals to check</span>`;
+  pv.innerHTML=`<div class="msg ${bad?"warn":"good"}">${B.items.length} files read · <b>${n}</b> ready to save${old?` · ${old} already in the register`:""}${bad?` · ${bad} with a problem (open those one at a time)`:""}. They are saved oldest first, so PIDs follow the invoice dates.</div>
+   <div class="tablewrap" style="max-height:420px"><table><thead><tr><th style="width:28px"><input type="checkbox" id="bAll" aria-label="Tick all" ${n&&n===B.items.filter(x=>!x.problem).length?"checked":""}></th><th>Invoice No.</th><th>Date</th><th>File</th><th class="num">Lines</th><th class="num">Value (₹)</th><th>Check</th></tr></thead><tbody>
+   ${B.items.map((x,i)=>`<tr><td><input type="checkbox" data-bpick="${i}" ${x.pick?"checked":""} ${x.problem||x.done||B.busy?"disabled":""} aria-label="Save ${esc(x.no||x.file)}"></td><td class="code">${esc(x.no||"—")}</td><td>${esc(x.date||"—")}</td><td class="note">${esc(x.file)}</td><td class="num">${x.lines??"—"}</td><td class="num">${x.value!=null?inr(x.value):"—"}</td><td>${st(x)}</td></tr>`).join("")}
+   </tbody></table></div>
+   <div class="row"><button class="btn primary" id="bSave" ${n&&S.canWrite&&!B.busy?"":"disabled"}>Save ${n} invoice${n===1?"":"s"} &amp; create ${esc(B.div)} PIDs</button><button class="btn" id="bDiscard" ${B.busy?"disabled":""}>${B.items.some(x=>x.done)?"Close":"Discard"}</button><span class="note" id="bNote">${esc(B.note||"")}</span></div>`;
+  pv.querySelectorAll("[data-bpick]").forEach(c=>c.onchange=()=>{ B.items[+c.dataset.bpick].pick=c.checked; renderBatch(pv); });
+  const all=pv.querySelector("#bAll"); if(all) all.onchange=()=>{ B.items.forEach(x=>{ if(!x.problem&&!x.done) x.pick=all.checked; }); renderBatch(pv); };
+  pv.querySelector("#bDiscard").onclick=()=>{ S.batch=null; pv.classList.add("hidden"); const card=pv.closest("[data-divcard]"); if(card) card.style.gridColumn=""; };
+  pv.querySelector("#bSave").onclick=async()=>{
+    B.busy=true; const todo=B.items.filter(x=>x.pick&&!x.done); let k=0, pids=0, first="", last="";
+    for(const x of todo){ k++; B.note=`Saving ${k} of ${todo.length}: invoice ${x.no}…`; renderBatch(pv);
+      try{ const pp={...x.p, head:{...x.p.head, invoiceNo:x.no}}; await saveInvoice(pp,true); const res=await createPids(x.no, B.div, pp.rows);
+        x.done=res.count?(res.count===1?`Saved · PID ${res.first}`:`Saved · PIDs ${res.first} … ${res.last}`):"Saved · lines already had PIDs"; x.pick=false; pids+=res.count||0; if(res.count){ if(!first) first=res.first; last=res.last; } }
+      catch(e){ x.err="stopped: "+(e.message||e.code)+" (nothing issued twice — try again)"; } }
+    B.busy=false; const ok=todo.filter(x=>x.done).length;
+    B.note=`Done: ${ok} of ${todo.length} invoice${todo.length===1?"":"s"} saved${pids?`, ${pids} PIDs created (${first} … ${last})`:""}.`; renderBatch(pv); };
+}
 async function handleFile(f, div, pv){
+  if(S.batch&&S.batch.busy){ const n=document.getElementById("bNote"); if(n) n.textContent="Still saving the previous files — drop the new one when this finishes."; return; }
   pv.classList.remove("hidden"); pv.innerHTML=`<div class="msg warn">Reading ${esc(f.name)}…</div>`;
   try{
-    const buf=new Uint8Array(await f.arrayBuffer()); let parsed;
-    if(/\.pdf$/i.test(f.name)){
-      pdfjsLib.GlobalWorkerOptions.workerSrc="lib/pdf.worker.min.js";
-      parsed=parseInvoiceLines(await pdfToLines(pdfjsLib, buf));
-    } else parsed=parseSheet(buf, f.name);
-    parsed.sourceFile=f.name; parsed.div=div; S.pending=parsed; showPreview(pv);
+    const parsed=await readInvoiceFile(f); parsed.div=div; S.pending=parsed; showPreview(pv);
   }catch(e){ console.error(e); pv.innerHTML=`<div class="msg bad">Couldn't read ${esc(f.name)}: ${esc(e.message||e)}. Use a PDF in the same supplier format, or the Excel file made earlier.</div>`; }
 }
 /* "Invoice Master" workbook: Invoice Summary (one row per invoice) + Invoice Lines (one row per item).
@@ -618,7 +663,7 @@ function parseSheet(buf,name){
   for(const r of A.slice(hi+1)){ const mat=String(r[ix.mat]||"").trim(); if(!mat||!/\d/.test(String(r[ix.sr]))) continue;
     rows.push({sr:parseInt(r[ix.sr]),hsn:String(r[ix.hsn]),mat,desc:String(r[ix.desc]),batch:String(r[ix.batch]||""),serial:ix.serial>=0?String(r[ix.serial]||""):"",exp:dstr(r[ix.exp]),uom:String(r[ix.uom]),qty:num(r[ix.qty]),mrp:num(r[ix.mrp]),rate:num(r[ix.rate]),basic:num(r[ix.basic]),disc:num(r[ix.disc]),freight:ix.freight>=0?num(r[ix.freight]):0,taxable:num(r[ix.taxable]),igstRate:num(r[ix.igstRate]),igst:num(r[ix.igst])}); }
   const title=A.slice(0,hi).flat().join(" ");
-  const head={invoiceNo:(title.match(/Invoice No\.?\s*(\d+)/i)||[])[1]||"",invoiceDate:(title.match(/dated\s*(\d{2}\.\d{2}\.\d{4})/i)||[])[1]||"",supplier:(title.match(/^\s*(.*?)\s+[–-]\s+Invoice/i)||[])[1]||"",buyer:"",invoiceValue:null};
+  const head={invoiceNo:cleanInvNo((title.match(/Invoice No\.?\s*([A-Za-z0-9][A-Za-z0-9\/\-_.]*)/i)||[])[1]||""),invoiceDate:(title.match(/dated\s*(\d{2}\.\d{2}\.\d{4})/i)||[])[1]||"",supplier:(title.match(/^\s*(.*?)\s+[–-]\s+Invoice/i)||[])[1]||"",buyer:"",invoiceValue:null};
   let footer=null; const fr=A.findIndex(r=>/invoice footer totals/i.test(r.join(" ")));
   if(fr>=0){ const r=A[fr]; footer={basic:num(r[ix.basic]),disc:num(r[ix.disc]),taxable:num(r[ix.taxable]),igst:num(r[ix.igst])}; }
   const vr=A.find(r=>/invoice value/i.test(r.join(" "))); if(vr) head.invoiceValue=num(vr.filter(c=>typeof c==="number").pop()??"");
@@ -642,7 +687,7 @@ function showPreview(pv){
    ${exists?`<div class="msg warn">Invoice ${esc(p.head.invoiceNo)} is already in the database${(S.registry[p.head.invoiceNo]||{}).division&&(S.registry[p.head.invoiceNo]||{}).division!==p.div?` under ${esc(S.registry[p.head.invoiceNo].division)}`:""}. Saving replaces its lines; PIDs already issued stay the same.</div>`:""}
    <div class="row"><button class="btn primary" data-act="save" ${R.length&&S.canWrite&&ok!==false&&seq?"":"disabled"}>Save &amp; create ${esc(p.div)} PIDs</button><button class="btn" data-act="discard">Discard</button><span class="note" data-act="note"></span></div>`;
   q('[data-act=save]').onclick=async e=>{ e.target.disabled=true; const note=t=>q('[data-act=note]').textContent=t;
-    const pp={...p, head:{...p.head, invoiceNo:q('.pInv').value.trim(), invoiceDate:q('.pDate').value.trim(), supplier:q('.pSup').value.trim()}};
+    const pp={...p, head:{...p.head, invoiceNo:cleanInvNo(q('.pInv').value), invoiceDate:q('.pDate').value.trim(), supplier:q('.pSup').value.trim()}};
     try{ note("Saving invoice…"); await saveInvoice(pp,true); note("Creating PIDs…");
       const res=await createPids(pp.head.invoiceNo, p.div, pp.rows);
       pv.innerHTML=`<div class="msg good">Saved invoice ${esc(pp.head.invoiceNo)} (${inr(pp.rows.length,0)} lines). ${res.count?`Created ${inr(res.count,0)} PIDs: ${esc(res.first)} … ${esc(res.last)}.`:"All lines already had PIDs."}</div>`; S.pending=null; }
