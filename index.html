@@ -491,7 +491,19 @@ function renderPid(){
     const n=S.counters[d.code]||0;
     c.querySelector(".divstats").innerHTML=`<div><div class="k">Invoices${ib("Invoices")}</div><div class="v">${inr(inv.length,0)}</div></div><div><div class="k">PIDs issued${ib("PIDs issued")}</div><div class="v">${inr(n,0)}</div></div><div><div class="k">Next PID${ib("Next PID")}</div><div class="v">${esc(fmtId(d.code,n+1))}</div></div>`;
     c.querySelector(".drop").classList.toggle("hidden",!S.canWrite||!S.db);
-    c.querySelector(".divinv").innerHTML= inv.length? inv.sort().map(no=>{ const LL=L.filter(r=>r.invoiceNo===no&&r.dhhId).map(r=>r.dhhId); return `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:6px"><span><b>${esc(no)}</b> · ${inr(L.filter(r=>r.invoiceNo===no).length,0)} lines · ${LL.length?esc(LL[0])+" … "+esc(LL[LL.length-1]):"no PIDs"}</span>${S.canWrite?`<button class="btn danger" data-del="${esc(no)}">Delete invoice</button>`:""}</div>`; }).join("") : "No invoices yet.";
+    { // uploaded invoices: hidden until you open them, newest first, searchable
+      const box=c.querySelector(".divinv"); S.invOpen=S.invOpen||{}; S.invQ=S.invQ||{}; const open=!!S.invOpen[d.code], q=(S.invQ[d.code]||"").toLowerCase();
+      const dk=no=>{ const m=String((S.invoices[no]||{}).invoiceDate||"").match(/(\d{2})\.(\d{2})\.(\d{4})/); return m?m[3]+m[2]+m[1]:""; };
+      const list=inv.slice().sort((a,b)=>dk(b).localeCompare(dk(a))||String(b).localeCompare(String(a)));
+      const shown=list.filter(no=>!q||[no,(S.invoices[no]||{}).invoiceDate,(S.invoices[no]||{}).supplier,...L.filter(r=>r.invoiceNo===no).map(r=>r.dhhId||"")].join(" ").toLowerCase().includes(q));
+      const row=no=>{ const LL=L.filter(r=>r.invoiceNo===no&&r.dhhId).map(r=>r.dhhId); const iv=S.invoices[no]||{}; return `<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);padding-top:6px"><span><b>${esc(no)}</b> · ${esc(iv.invoiceDate||"")} · ${inr(L.filter(r=>r.invoiceNo===no).length,0)} lines · ${LL.length?esc(LL[0])+(LL.length>1?" … "+esc(LL[LL.length-1]):""):"no PIDs"}</span>${S.canWrite?`<button class="btn danger" data-del="${esc(no)}">Delete invoice</button>`:""}</div>`; };
+      box.innerHTML = !inv.length ? "No invoices yet." :
+        `<button class="btn" data-invtog="${esc(d.code)}" aria-expanded="${open}" style="width:100%;justify-content:space-between;display:flex">${open?"▾ Hide":"▸ Show"} uploaded invoices <span class="note">${inr(inv.length,0)} invoice${inv.length===1?"":"s"} · ${inr(L.length,0)} lines</span></button>`+
+        (open?`${inv.length>6?`<input type="search" data-invq="${esc(d.code)}" value="${esc(S.invQ[d.code]||"")}" placeholder="Search invoice no., date or PID…" style="width:100%;margin:8px 0 2px" aria-label="Search ${esc(d.name)} invoices">`:""}
+          <div style="display:grid;gap:6px;margin-top:6px;max-height:420px;overflow:auto">${shown.map(row).join("")||'<div class="note">No invoice matches.</div>'}</div>`:"");
+      const t=box.querySelector("[data-invtog]"); if(t) t.onclick=()=>{ S.invOpen[d.code]=!S.invOpen[d.code]; render(); };
+      const qi=box.querySelector("[data-invq]"); if(qi) qi.oninput=e=>{ S.invQ[d.code]=e.target.value; clearTimeout(S._invT); S._invT=setTimeout(()=>{ render(); const x=document.querySelector(`[data-invq="${d.code}"]`); if(x){ x.focus(); x.setSelectionRange(x.value.length,x.value.length); } },250); };
+    }
   }
   const un=Object.values(S.invoices).filter(i=>S.items.some(r=>r.invoiceNo===i.invoiceNo&&!r.dhhId)).sort((a,b)=>a.invoiceNo<b.invoiceNo?-1:1);
   const box=$("unassignedBox"); box.classList.toggle("hidden",!un.length);
