@@ -166,3 +166,41 @@ function renderGroups() {
     catch (e) { msg($("gMsg"), "bad", "Couldn't save: " + (e.message || e.code) + (/permission/i.test(e.code || e.message || "") ? " — only an admin can change this until the new Firestore rules are published." : "")); }
   };
 }
+
+/* ---------- units bar: total units for whatever the line list / product master is showing ---------- */
+(function unitsBar() {
+  Object.assign(INFO, {
+    "Units in stock": "Pieces you have now: received − sold on tax invoices − out on delivery challans (returns added back).\nIt totals only the rows you are looking at, so pick a product, group or division in the filters to see its count.",
+    "Units received": "Pieces bought on supplier invoices, for the rows you are looking at.",
+    "Units sold / out": "Pieces on active tax invoices plus pieces out on delivery challans not returned.",
+    "Stock value": "Units in stock × purchase Rate.\nUse: value of the goods you are holding."
+  });
+  const st = document.createElement("style");
+  st.textContent = `.unitsbar{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .unitsbar .u{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-width:120px}
+  .unitsbar .u .k{font-size:11.5px;color:var(--muted);display:flex;align-items:center}.unitsbar .u .v{font-size:18px;font-weight:700}
+  .unitsbar .u.main{border-color:var(--accent)}.unitsbar .u.main .v{color:var(--accent)}.unitsbar .scope{font-size:12px;color:var(--muted);align-self:center;margin-left:auto}`;
+  document.head.appendChild(st);
+  // default columns: show the stock quantities
+  const addCol = (arr, key, after) => { if (arr && !arr.includes(key)) { const i = arr.indexOf(after); arr.splice(i < 0 ? arr.length : i + 1, 0, key); } };
+  addCol(S.colsLines, "availQty", "qty"); addCol(S.colsMaster, "totalQty", "desc"); addCol(S.colsMaster, "availQty", "totalQty");
+  const _render = render;
+  render = function () {
+    const r = _render.apply(this, arguments);
+    try {
+      if (S.tab !== "lines" && S.tab !== "master") return r;
+      const tb = $("count") && $("count").closest(".toolbar"); if (!tb) return r;
+      let bar = $("unitsbar"); if (!bar) { bar = document.createElement("div"); bar.id = "unitsbar"; bar.className = "unitsbar"; tb.after(bar); }
+      const isM = S.tab === "master"; const rows = filtered();
+      const all = isM ? (S.master || []) : (S.items || []);
+      const rec = rows.reduce((a, x) => a + (+(isM ? x.totalQty : x.qty) || 0), 0), sold = rows.reduce((a, x) => a + (+x.soldQty || 0), 0), avail = rows.reduce((a, x) => a + (+x.availQty || 0), 0);
+      const val = isM ? rows.reduce((a, m) => a + (+m.availQty || 0) * (+m.rate || 0), 0) : rows.reduce((a, x) => a + (+x.availQty || 0) * (typeof costOfItem === "function" ? costOfItem(x) : +x.rate || 0), 0);
+      const prods = isM ? rows.length : new Set(rows.map(x => x.mat)).size;
+      const filteredOn = rows.length !== all.length;
+      const u = (k, v, cls) => `<div class="u ${cls || ""}"><div class="k">${k}${ib(k)}</div><div class="v">${v}</div></div>`;
+      bar.innerHTML = u("Units in stock", inr(avail, 0), "main") + u("Units received", inr(rec, 0)) + u("Units sold / out", inr(sold, 0)) + u("Stock value", "₹ " + inr(val, 0)) +
+        `<div class="scope">${filteredOn ? `For the <b>${inr(rows.length, 0)}</b> ${isM ? (rows.length === 1 ? "product" : "products") : (rows.length === 1 ? "line" : "lines")} shown (${inr(prods, 0)} product${prods === 1 ? "" : "s"}) · clear the filters for the whole inventory` : `Whole inventory · ${inr(prods, 0)} products · ${inr(isM ? all.reduce((a, m) => a + (+m.lines || 0), 0) : all.length, 0)} lines`}</div>`;
+    } catch (e) { console.error(e); }
+    return r;
+  };
+})();
