@@ -1,4 +1,4 @@
-/* Firebase connector for the Implant Product Register (GitHub Pages version).
+/* Firebase connector for D Cart (GitHub Pages version).
  *
  * The app talks to its database through window.claude.use("db"), the claude.ai
  * artifact database. Outside claude.ai that doesn't exist, so this file provides
@@ -86,7 +86,7 @@
       g.style.cssText = "position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg,#f4f6f7);font-family:var(--font-body,system-ui)";
       document.body.appendChild(g); }
     g.innerHTML = `<div style="background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:10px;padding:28px 32px;max-width:420px;text-align:center;display:grid;gap:14px">
-      <b style="font-size:18px">Implant Product Register</b><div style="color:var(--muted,#666)">${text}</div>
+      <b style="font-size:18px">D Cart</b><div style="color:var(--muted,#666)">${text}</div>
       ${withButton ? '<button id="fbSignIn" class="btn primary" style="justify-self:center">Sign in with Google</button><div id="fbErr" style="color:#b42318;font-size:13px"></div>' : ""}</div>`;
     const b = document.getElementById("fbSignIn");
     if (b) b.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => { document.getElementById("fbErr").textContent = e.message; });

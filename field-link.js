@@ -1,5 +1,5 @@
 /* =====================================================================
-   Implant Product Register (GitHub version) ↔ Dr. Han Field Sales app
+   D Cart (GitHub version) ↔ Dr. Han Field Sales app
    The register keeps its own database (dhh-register). This file opens a
    second, separate connection to the Field app's database (han-field-tracker)
    and, once you connect with the Field app's ADMIN login:

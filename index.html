@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Implant Product Register</title>
+<title>D Cart</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -159,7 +159,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <body>
 <header class="app">
   <div class="titlerow">
-    <h1>Implant Product Register</h1>
+    <h1>D Cart</h1>
     <span class="sub" id="subline">Product lines from supplier invoices</span>
     <span class="status"><span class="dot" id="dbdot"></span><span id="dbstatus">Connecting to database…</span></span>
     <div class="themesw" role="group" aria-label="Colour theme"><button type="button" data-theme-set="light" aria-pressed="false" title="Light theme">☀ Light</button><button type="button" data-theme-set="dark" aria-pressed="false" title="Dark theme">☾ Dark</button></div>
@@ -307,7 +307,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=2"></script>
-<script src="firebase-adapter.js?v=3"></script>
+<script src="firebase-adapter.js?v=4"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="lib/pdf.min.js"></script>
 <script src="parser.js"></script>
@@ -722,7 +722,7 @@ function aoaFor(fields, rows){ return [fields.map(f=>f[1]), ...rows.map(r=>field
 function sqlDump(){
   const q=v=>v==null||v===""?"NULL":typeof v==="number"?String(v):"'"+String(v).replace(/\\/g,"\\\\").replace(/'/g,"''")+"'";
   const d=s=>{ if(!s) return "NULL"; const [dd,mm,yy]=s.split("."); return `'${yy}-${mm}-${dd}'`; };
-  let s=`-- Implant Product Register export ${new Date().toISOString()}\n-- MySQL / MariaDB\nSET NAMES utf8mb4;\n\nCREATE TABLE IF NOT EXISTS invoices (\n  invoice_no VARCHAR(40) PRIMARY KEY,\n  invoice_date DATE,\n  supplier VARCHAR(200), supplier_gstin VARCHAR(20),\n  buyer VARCHAR(200), buyer_gstin VARCHAR(20),\n  dc_no VARCHAR(40), so_no VARCHAR(40),\n  invoice_value DECIMAL(14,2),\n  printed_basic DECIMAL(14,2), printed_discount DECIMAL(14,2), printed_taxable DECIMAL(14,2), printed_igst DECIMAL(14,2),\n  line_count INT, source_file VARCHAR(255), imported_at VARCHAR(40)\n);\n\nCREATE TABLE IF NOT EXISTS invoice_items (\n  invoice_no VARCHAR(40) NOT NULL,\n  sr_no INT NOT NULL,\n  dhh_product_id VARCHAR(20), division_code VARCHAR(10), division_name VARCHAR(100),\n  hsn_code VARCHAR(12), material_code VARCHAR(60) NOT NULL, description VARCHAR(400),\n  batch_no VARCHAR(40), serial_no VARCHAR(40), expiry_date DATE, uom VARCHAR(10),\n  qty DECIMAL(12,3), mrp DECIMAL(14,2), rate DECIMAL(14,2), basic_amount DECIMAL(14,2), discount_amount DECIMAL(14,2),\n  freight DECIMAL(14,2), taxable_amount DECIMAL(14,2), igst_rate DECIMAL(5,2), igst_amount DECIMAL(14,2), qty_sold DECIMAL(12,3), qty_available DECIMAL(12,3),\n  PRIMARY KEY (invoice_no, sr_no),\n  UNIQUE KEY uq_dhh_product_id (dhh_product_id), KEY idx_division (division_code),\n  KEY idx_material (material_code), KEY idx_batch (batch_no), KEY idx_serial (serial_no)\n);\n\n`;
+  let s=`-- D Cart export ${new Date().toISOString()}\n-- MySQL / MariaDB\nSET NAMES utf8mb4;\n\nCREATE TABLE IF NOT EXISTS invoices (\n  invoice_no VARCHAR(40) PRIMARY KEY,\n  invoice_date DATE,\n  supplier VARCHAR(200), supplier_gstin VARCHAR(20),\n  buyer VARCHAR(200), buyer_gstin VARCHAR(20),\n  dc_no VARCHAR(40), so_no VARCHAR(40),\n  invoice_value DECIMAL(14,2),\n  printed_basic DECIMAL(14,2), printed_discount DECIMAL(14,2), printed_taxable DECIMAL(14,2), printed_igst DECIMAL(14,2),\n  line_count INT, source_file VARCHAR(255), imported_at VARCHAR(40)\n);\n\nCREATE TABLE IF NOT EXISTS invoice_items (\n  invoice_no VARCHAR(40) NOT NULL,\n  sr_no INT NOT NULL,\n  dhh_product_id VARCHAR(20), division_code VARCHAR(10), division_name VARCHAR(100),\n  hsn_code VARCHAR(12), material_code VARCHAR(60) NOT NULL, description VARCHAR(400),\n  batch_no VARCHAR(40), serial_no VARCHAR(40), expiry_date DATE, uom VARCHAR(10),\n  qty DECIMAL(12,3), mrp DECIMAL(14,2), rate DECIMAL(14,2), basic_amount DECIMAL(14,2), discount_amount DECIMAL(14,2),\n  freight DECIMAL(14,2), taxable_amount DECIMAL(14,2), igst_rate DECIMAL(5,2), igst_amount DECIMAL(14,2), qty_sold DECIMAL(12,3), qty_available DECIMAL(12,3),\n  PRIMARY KEY (invoice_no, sr_no),\n  UNIQUE KEY uq_dhh_product_id (dhh_product_id), KEY idx_division (division_code),\n  KEY idx_material (material_code), KEY idx_batch (batch_no), KEY idx_serial (serial_no)\n);\n\n`;
   for(const i of Object.values(S.invoices)){ const f=i.footer||{};
     s+=`REPLACE INTO invoices VALUES (${q(i.invoiceNo)},${d(i.invoiceDate)},${q(i.supplier)},${q(i.supplierGstin)},${q(i.buyer)},${q(i.buyerGstin)},${q(i.dcNo)},${q(i.soNo)},${q(i.invoiceValue)},${q(f.basic)},${q(f.disc)},${q(f.taxable)},${q(f.igst)},${q(i.rowCount)},${q(i.sourceFile)},${q(i.importedAt)});\n`; }
   s+="\n";
@@ -732,7 +732,7 @@ function sqlDump(){
 }
 async function doExport(kind){
   if(!S.items.length){ msg($("expmsg"),"warn","There's no data to export yet."); return; }
-  const base="implant_register_"+stamp();
+  const base="dcart_"+stamp();
   if(kind==="sql") return save(base+".sql.txt", sqlDump());
   if(kind==="json") return save(base+".json", JSON.stringify({exportedAt:new Date().toISOString(),invoices:Object.values(S.invoices),divisions:S.divisions,items:S.items.map(({matchCount,discPct,lineTotal,netRate,supplier,invoiceDate,key,idConflict,...r})=>r),sales:S.sales,customers:S.customers},null,1));
   if(kind==="csvall") return save(base+"_lines.csv", csv(aoaFor(LINE_FIELDS,S.items)));
@@ -783,7 +783,7 @@ async function makeBackup(){
   return {app:"implant-product-register",version:1,exportedAt:new Date().toISOString(),count:Object.keys(docs).length,docs};
 }
 $("btnBackup").onclick=async()=>{ if(!S.db){ msg($("bkmsg"),"bad","The database isn't connected."); return; }
-  try{ const b=await makeBackup(); await save(`implant_register_backup_${stamp()}.json`, JSON.stringify(b)); msg($("bkmsg"),"good",`Backup has ${b.count} records.`); }
+  try{ const b=await makeBackup(); await save(`dcart_backup_${stamp()}.json`, JSON.stringify(b)); msg($("bkmsg"),"good",`Backup has ${b.count} records.`); }
   catch(e){ msg($("bkmsg"),"bad","Backup failed: "+(e.message||e.code)); } };
 $("btnRestore").onclick=()=>$("restoreFile").click();
 $("restoreFile").onchange=async e=>{ const f=e.target.files[0]; e.target.value=""; if(!f) return; const m=$("bkmsg");
@@ -808,7 +808,7 @@ $("btnClear").onclick=async()=>{
   try{
     msg(m,"warn","Preparing the backup…");
     const bk=await makeBackup();
-    try{ await downloads.save({filename:`implant_register_backup_before_clear_${stamp()}.json`, data:JSON.stringify(bk)}); }
+    try{ await downloads.save({filename:`dcart_backup_before_clear_${stamp()}.json`, data:JSON.stringify(bk)}); }
     catch(e){ msg(m,"bad","The backup wasn't saved"+(e&&e.code==="declined"?" (download declined)":"")+", so nothing was deleted."); return; }
     const paths=[];
     const add=(col,obj)=>Object.keys(obj||{}).forEach(id=>paths.push(col+"/"+id));
@@ -913,7 +913,7 @@ render();
 <script src="pricing.js?v=6"></script>
 <script src="cashflow.js?v=2"></script>
 <script src="groups.js?v=3"></script>
-<script src="field-link.js?v=1"></script>
+<script src="field-link.js?v=2"></script>
 <script>
 /* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */
 (function(){
