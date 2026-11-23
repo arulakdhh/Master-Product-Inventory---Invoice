@@ -248,7 +248,7 @@ function supplyEvent(e) {
 }
 
 /* ===================== PAYMENTS ===================== */
-function invoiceReceived(invId) { let s = 0; for (const r of Object.values(S.receipts)) { if (r.status === "cancelled") continue; for (const a of r.allocations || []) if (a.invId === invId) s += a.amount; } return r2(s); }
+function invoiceReceived(invId) { const dd = S.sales[invId]; if (dd && dd.paidOutside) return r2(dd.totals?.grand || 0); let s = 0; for (const r of Object.values(S.receipts)) { if (r.status === "cancelled") continue; for (const a of r.allocations || []) if (a.invId === invId) s += a.amount; } return r2(s); }
 function invoiceBalance(id) { const d = S.sales[id]; return d ? r2((d.totals?.grand || 0) - invoiceReceived(id)) : 0; }
 function invDue(d) { if (d.dueDate) return d.dueDate; const c = S.customers[d.customerId]; const x = new Date(d.date); x.setDate(x.getDate() + (c && c.creditDays != null ? +c.creditDays : 30)); return x.toISOString().slice(0, 10); }
 function invoicePayPill(d) {

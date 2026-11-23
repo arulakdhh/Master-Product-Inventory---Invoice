@@ -65,8 +65,8 @@ function cfInvoices() {
   for (const [id, d] of Object.entries(S.sales || {})) {
     if (d.type !== "INV" || d.status === "cancelled" || !d.date) continue;
     const grand = r2(d.totals?.grand || 0); const P = (pays[id] || []).sort((a, b) => a.date < b.date ? -1 : 1);
-    const paid = r2(P.reduce((a, x) => a + x.amount, 0)); const bal = r2(grand - paid);
-    const daysW = paid > 0 ? P.reduce((a, x) => a + x.amount * Math.max(0, cfDays(d.date, x.date)), 0) / paid : null;
+    const paid = d.paidOutside ? grand : r2(P.reduce((a, x) => a + x.amount, 0)); const bal = r2(grand - paid);
+    const daysW = paid > 0 && !d.paidOutside ? P.reduce((a, x) => a + x.amount * Math.max(0, cfDays(d.date, x.date)), 0) / paid : null;
     out.push({ id, d, no: d.no, date: d.date, cust: custName(d), custId: d.customerId || custName(d), grand, paid, bal, pays: P, daysToPay: daysW, fullyPaid: bal <= 0.5, due: typeof invDue === "function" ? invDue(d) : cfAdd(d.date, d.creditDays || 30) });
   }
   return out;

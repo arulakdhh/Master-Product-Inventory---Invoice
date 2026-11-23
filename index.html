@@ -963,13 +963,14 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=17"></script>
-<script src="ops.js?v=3"></script>
+<script src="sales.js?v=18"></script>
+<script src="ops.js?v=4"></script>
 <script src="analytics.js?v=4"></script>
 <script src="studio.js?v=1"></script>
 <script src="pricing.js?v=6"></script>
-<script src="cashflow.js?v=2"></script>
+<script src="cashflow.js?v=3"></script>
 <script src="groups.js?v=4"></script>
+<script src="billimport.js?v=1"></script>
 <script src="field-link.js?v=2"></script>
 <script>
 /* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */

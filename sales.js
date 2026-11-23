@@ -120,10 +120,11 @@ function renderSales() {
     <div class="panel pad">
       <div class="row" style="justify-content:space-between">
         <h2 style="margin:0">${esc(md.title)}</h2>
-        <div class="row">${md.buttons.map(([t, l], i) => `<button class="btn ${i ? "" : "primary"}" data-new="${t}">${esc(l)}</button>`).join("")}</div>
+        <div class="row">${md.buttons.map(([t, l], i) => `<button class="btn ${i ? "" : "primary"}" data-new="${t}">${esc(l)}</button>`).join("")}${md.types.includes("INV") && canType("INV") && typeof openBillImport === "function" ? `<button class="btn" id="btnImpBills">Import past bills</button>` : ""}</div>
       </div>
       <p class="note" style="margin:8px 0 0">${esc(md.note)}</p>
     </div>
+    <div class="panel pad hidden" id="impBox"></div>
     <div class="panel pad hidden" id="editor"></div>
     <div class="panel hidden" id="docView"></div>
     <div class="panel">
@@ -317,6 +318,7 @@ async function salesClick(e) {
   if (b.dataset.pdf) return downloadPdf(b.dataset.pdf);
   if (b.id === "closeView") { S.salesView = null; $("docView").classList.add("hidden"); return; }
   if (b.id === "btnCompany") { $("companyBox").classList.toggle("hidden"); return renderCompany(); }
+  if (b.id === "btnImpBills") return openBillImport();
   if (b.id === "btnCustomers") { $("customerBox").classList.toggle("hidden"); return renderCustomers(); }
   if (b.id === "saveCompany") return saveCompany(b);
   if (b.id === "coThemePreview") return previewTheme();
