@@ -112,5 +112,18 @@
     s.querySelector("button").onclick = () => auth.signOut().then(() => location.reload());
     st.appendChild(s);
   }
-  window.addEventListener("error", e => { if (/permission/i.test(e.message || "")) showGate("Your Google account isn't allowed to use this register. Ask the owner to add your email to the Firestore rules.", true); });
+  /* A blocked read/write must not throw a signed-in user back to the sign-in screen: show a banner instead. */
+  function permBanner(m) {
+    if (!/permission|insufficient/i.test(m || "")) return;
+    const u = auth.currentUser;
+    if (!u) { showGate("Sign in to open the register.", true); return; }
+    let b = document.getElementById("fbPerm");
+    if (!b) { b = document.createElement("div"); b.id = "fbPerm"; b.setAttribute("role", "alert");
+      b.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:60;background:#b42318;color:#fff;border-radius:8px;padding:10px 14px;font:13px/1.45 system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)";
+      document.body.appendChild(b); }
+    b.innerHTML = `Signed in as <b>${u.email}</b>, but Firebase refused to read or save some data (Firestore rules). Check that this Gmail is in the <code>owners()</code> line of the rules, or is added in Admin panel → Users &amp; access. <button style="margin-left:8px" onclick="this.parentNode.remove()">Hide</button>`;
+  }
+  window.addEventListener("error", e => permBanner(e.message));
+  window.addEventListener("unhandledrejection", e => permBanner(e.reason && (e.reason.message || String(e.reason))));
+  auth.onAuthStateChanged(u => { if (u) console.info("D Cart: signed in as", u.email); else console.info("D Cart: signed out"); });
 })();
