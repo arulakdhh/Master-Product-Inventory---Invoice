@@ -15,8 +15,10 @@
     document.addEventListener("DOMContentLoaded", () => showGate("Setup needed: paste your Firebase settings into firebase-config.js (see README)."));
     window.claude = { use: async () => null }; return;
   }
-  firebase.initializeApp(window.FIREBASE_CONFIG);
-  const auth = firebase.auth(); const fs = firebase.firestore();
+  /* D Cart uses its own named Firebase app, so its sign-in is kept separately from any other app on this
+     website (the D Shop customer app signs out anyone who isn't a shop customer — that must not sign D Cart out). */
+  const fbApp = firebase.apps.find(a => a.name === "dcart") || firebase.initializeApp(window.FIREBASE_CONFIG, "dcart");
+  const auth = fbApp.auth(); const fs = fbApp.firestore();
   try { fs.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
 
   const wrapDocSnap = s => ({ id: s.id, exists: s.exists, data: () => s.data(), metadata: { fromCache: s.metadata.fromCache, hasPendingWrites: s.metadata.hasPendingWrites } });
