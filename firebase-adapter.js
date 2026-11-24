@@ -89,7 +89,18 @@
       <b style="font-size:18px">D Cart</b><div style="color:var(--muted,#666)">${text}</div>
       ${withButton ? '<button id="fbSignIn" class="btn primary" style="justify-self:center">Sign in with Google</button><div id="fbErr" style="color:#b42318;font-size:13px"></div>' : ""}</div>`;
     const b = document.getElementById("fbSignIn");
-    if (b) b.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => { document.getElementById("fbErr").textContent = e.message; });
+    if (b) b.onclick = () => {
+      if (b.disabled) return; b.disabled = true; b.textContent = "Opening Google sign-in…";
+      const err = document.getElementById("fbErr"); err.textContent = "";
+      const prov = new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+      auth.signInWithPopup(prov).catch(e => {
+        const c = e && e.code || "";
+        if (c === "auth/popup-blocked" || c === "auth/operation-not-supported-in-this-environment") return auth.signInWithRedirect(prov);
+        b.disabled = false; b.textContent = "Sign in with Google";
+        if (c === "auth/cancelled-popup-request" || c === "auth/popup-closed-by-user") { err.textContent = "Sign-in window was closed. Click the button once and finish signing in there."; return; }
+        err.textContent = e.message;
+      });
+    };
   }
   function hideGate() { const g = document.getElementById("fbGate"); if (g) g.remove(); }
   function showUserBar(u) {
