@@ -65,6 +65,7 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000); return { status: "saved" }; } };
 
+  auth.getRedirectResult().catch(e => { setTimeout(() => { const x = document.getElementById("fbErr"); if (x) x.textContent = "Google sign-in didn't finish: " + (e.message || e.code); }, 300); });
   let signedIn; const ready = new Promise(res => signedIn = res);
   auth.onAuthStateChanged(u => {
     if (u) { hideGate(); showUserBar(u); signedIn(u); }
@@ -95,8 +96,9 @@
       const prov = new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
       auth.signInWithPopup(prov).catch(e => {
         const c = e && e.code || "";
-        if (c === "auth/popup-blocked" || c === "auth/operation-not-supported-in-this-environment") return auth.signInWithRedirect(prov);
         b.disabled = false; b.textContent = "Sign in with Google";
+        if (c === "auth/popup-blocked") { err.innerHTML = "Your browser blocked the Google sign-in window. Click the blocked-popup icon at the right of the address bar → <b>Always allow pop-ups</b> for this site, then click the button again."; return; }
+        if (c === "auth/operation-not-supported-in-this-environment") { err.textContent = "This browser can't open the Google sign-in window. Open this page in Chrome or Edge."; return; }
         if (c === "auth/cancelled-popup-request" || c === "auth/popup-closed-by-user") { err.textContent = "Sign-in window was closed. Click the button once and finish signing in there."; return; }
         err.textContent = e.message;
       });
