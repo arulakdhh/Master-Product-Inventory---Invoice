@@ -1,4 +1,4 @@
-# Implant Product Register — GitHub Pages + Firebase
+# D Cart — GitHub Pages + Firebase
 
 This is the same app as the claude.ai version, set up to run on GitHub Pages. The data lives in **Google Firebase (Firestore)**, and people sign in with their Google account.
 

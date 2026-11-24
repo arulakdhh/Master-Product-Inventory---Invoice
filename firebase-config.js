@@ -1,4 +1,4 @@
-// Firebase settings for the Implant Product Register. Keep exactly this shape: window.FIREBASE_CONFIG = { ... };
+// Firebase settings for D Cart. Keep exactly this shape: window.FIREBASE_CONFIG = { ... };
 // No import lines, no initializeApp: firebase-adapter.js does that.
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyDKgk68l20g3x6l4v4mwDUqmnsJEs_OAgQ",

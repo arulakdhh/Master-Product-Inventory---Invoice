@@ -1,5 +1,5 @@
 rules_version = '2';
-// Implant Product Register — access rules.
+// D Cart — access rules (updated 24.11.2026: cash flow and product group settings).
 // 1. Put your own Gmail below as the owner (owners are always admin).
 // 2. Firebase console → Firestore Database → Rules → paste this → Publish.
 // Everyone else is added and given panel access in the app: Admin panel → Users & access.
@@ -51,67 +51,12 @@ service cloud.firestore {
     match /reports/{id}        { allow read: if canView('studio'); allow write: if canEdit('studio'); }
     match /locks/{id}          { allow read, write: if active(); }
 
-    // ---------- D Shop (customer app) ----------
-    // Customers sign in with a login ID; their account is linked to shopUsers/{uid}.
-    // They can read only their own customer's records, the published catalog (selling
-    // prices, no purchase rates), and create their own orders and payment advices.
-    function shopSignedIn() { return request.auth != null && exists(/databases/$(database)/documents/shopUsers/$(request.auth.uid)); }
-    function shopMe() { return get(/databases/$(database)/documents/shopUsers/$(request.auth.uid)).data; }
-    function shopActive() { return shopSignedIn() && shopMe().get('active', true) == true; }
-    function shopCid() { return shopMe().cid; }
-    function shopStaffView() { return canView('shop'); }
-    function shopStaffEdit() { return canEdit('shop'); }
-
-    match /shopLogins/{loginId} {
-      allow get: if true;                       // the login screen looks up a login ID
-      allow list: if shopStaffView();
-      allow write: if shopStaffEdit();
-    }
-    match /shopUsers/{uid} {
-      allow read: if (request.auth != null && request.auth.uid == uid) || shopStaffView();
-      allow create, delete: if shopStaffEdit();
-      // a customer may only clear their own "must change password" flag
-      allow update: if shopStaffEdit()
-        || (request.auth != null && request.auth.uid == uid
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustReset', 'pwChangedAt'])
-            && request.resource.data.mustReset == false);
-    }
-    match /shopCustomers/{cid} {
-      allow read: if shopStaffView() || (shopActive() && shopCid() == cid);
-      allow write: if shopStaffEdit();
-    }
-    match /shopCatalog/{doc} {
-      allow read: if shopActive() || active();
-      allow write: if shopStaffEdit();
-    }
-    match /shopOrders/{id} {
-      allow read: if shopStaffView() || (shopActive() && resource.data.cid == shopCid());
-      allow create: if shopActive()
-        && request.resource.data.cid == shopCid()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.status == 'sent'
-        && request.resource.data.get('saleIds', []).size() == 0;
-      allow update, delete: if shopStaffEdit();
-    }
-    match /shopDocs/{id} {
-      allow read: if shopStaffView() || (shopActive() && resource.data.cid == shopCid());
-      allow write: if shopStaffEdit();
-    }
-    match /shopDues/{cid} {
-      allow read: if shopStaffView() || (shopActive() && shopCid() == cid);
-      allow write: if shopStaffEdit();
-    }
-    match /shopAdvices/{id} {
-      allow read: if shopStaffView() || canView('payrecv') || (shopActive() && resource.data.cid == shopCid());
-      allow create: if shopActive() && request.resource.data.cid == shopCid() && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'new';
-      allow update: if shopStaffEdit() || canEdit('payrecv');
-      allow delete: if shopStaffEdit();
-    }
-
     match /settings/{doc} {
       allow read: if active();
       allow write: if isAdmin()
         || (doc == 'company' && canEdit('company'))
+        || ((doc == 'pricing' || doc == 'groups') && canEdit('inventory'))
+        || (doc == 'cashflow' && (canEdit('payrecv') || canEdit('analytics')))
         || ((doc == 'counters' || doc == 'divisions') && canEdit('invoice'))
         || (doc == 'salescounters' && (canEdit('invoice') || canEdit('dispatch') || canEdit('sellorder') || canEdit('po') || canEdit('payrecv') || canEdit('supply')));
     }
