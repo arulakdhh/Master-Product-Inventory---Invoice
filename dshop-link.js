@@ -43,11 +43,28 @@
     if (typeof S !== "undefined" && S.tab === "dshop") render();
   });
 
-  /* ---------- product names and sizes only ---------- */
-  function feedList() {
-    return (S.master || []).filter(m => m.mat && m.desc).map(m => ({ code: String(m.mat), desc: String(m.desc).trim(), hsn: String(m.hsn || ""), uom: String(m.uom || ""), rate: Math.round((+m.rate || 0) * 100) / 100 }))
-      .sort((a, b) => a.desc.localeCompare(b.desc, undefined, { numeric: true }));
+  /* ---------- product names, sizes and rates ----------
+     Rate = the purchase cost D Cart itself uses for selling (the invoice line's
+     rate, or taxable ÷ qty when the invoice has no rate column), from the latest
+     purchase of that product. */
+  function costOf(r) { if (!r) return 0; if (typeof costOfItem === "function") return +costOfItem(r) || 0; return +r.rate || (r.qty ? (+r.taxable || 0) / r.qty : 0); }
+  function rateMap() {
+    const best = {};
+    for (const r of S.items || []) {
+      if (!r.mat) continue; const c = costOf(r); if (!(c > 0)) continue;
+      const d = (typeof toDate === "function" && toDate(r.invoiceDate)) || new Date(0);
+      const b = best[r.mat]; if (!b || d >= b.d) best[r.mat] = { d, c };
+    }
+    return best;
   }
+  function feedList() {
+    const rm = rateMap();
+    return (S.master || []).filter(m => m.mat && m.desc).map(m => {
+      const own = +m.rate > 0 ? +m.rate : (rm[m.mat] ? rm[m.mat].c : 0);
+      return { code: String(m.mat), desc: String(m.desc).trim(), hsn: String(m.hsn || ""), uom: String(m.uom || ""), rate: Math.round((own || 0) * 100) / 100 };
+    }).sort((a, b) => a.desc.localeCompare(b.desc, undefined, { numeric: true }));
+  }
+  const withRate = list => list.filter(x => x.rate > 0).length;
   function schedule(ms) { clearTimeout(timer); timer = setTimeout(() => send(false), ms || 4000); }
   function setState(t) { state = t; const el = document.getElementById("dsState"); if (el) el.innerHTML = t; }
   async function send(force) {
@@ -57,11 +74,11 @@
     const list = feedList();
     if (!list.length) return setState(`<b style="color:var(--bad)">No products to send yet.</b> Add supplier invoices first.`);
     const sig = hash(JSON.stringify(list));
-    if (!force && (sig === lastSig || sig === remoteSig)) { lastSig = sig; return setState(`✅ D Shop has D Cart's products: <b>${list.length}</b> names, sizes and rates.`); }
+    if (!force && (sig === lastSig || sig === remoteSig)) { lastSig = sig; return setState(`✅ D Shop has D Cart's products: <b>${list.length}</b> names, sizes and rates (<b>${withRate(list)}</b> with a rate).`); }
     try {
       await dfs.doc("private/dcartFeed").set({ list, count: list.length, sig, source: "D Cart", updatedAt: new Date().toISOString(), by: S.myEmail || "" });
       lastSig = sig; remoteSig = sig;
-      setState(`✅ Sent to D Shop: <b>${list.length}</b> products with names, sizes and rates (just now). D Shop prices them automatically (rate + sell %).`);
+      setState(`✅ Sent to D Shop: <b>${list.length}</b> products with names, sizes and rates (<b>${withRate(list)}</b> with a rate, just now). D Shop prices them automatically (rate + sell %).`);
     } catch (e) {
       setState(`<b style="color:var(--bad)">Couldn't send to D Shop: ${esc(e.code || e.message || String(e))}.</b> ${/permission/i.test(e.code || e.message || "") ? "Connect with the D Shop admin password, and check D Shop's Firestore rules are published." : ""}`);
     }
