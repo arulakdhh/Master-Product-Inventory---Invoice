@@ -3,7 +3,7 @@
    Sends product names, sizes and purchase RATE (code, description, HSN,
    unit, rate) to D Shop's admin-only area, automatically whenever D Cart's
    products change. D Shop shows customers only the selling price
-   (rate × sell %), never the rate. No stock, suppliers, divisions, PIDs or
+   (rate + sell %), never the rate. No stock, suppliers, divisions, PIDs or
    customers are sent.
    Connect once per computer with the D Shop admin password:
    Admin panel → D Shop link.
@@ -61,7 +61,7 @@
     try {
       await dfs.doc("private/dcartFeed").set({ list, count: list.length, sig, source: "D Cart", updatedAt: new Date().toISOString(), by: S.myEmail || "" });
       lastSig = sig; remoteSig = sig;
-      setState(`✅ Sent to D Shop: <b>${list.length}</b> products with names, sizes and rates (just now). D Shop prices them automatically (rate × sell %).`);
+      setState(`✅ Sent to D Shop: <b>${list.length}</b> products with names, sizes and rates (just now). D Shop prices them automatically (rate + sell %).`);
     } catch (e) {
       setState(`<b style="color:var(--bad)">Couldn't send to D Shop: ${esc(e.code || e.message || String(e))}.</b> ${/permission/i.test(e.code || e.message || "") ? "Connect with the D Shop admin password, and check D Shop's Firestore rules are published." : ""}`);
     }
@@ -81,7 +81,7 @@
     const el = document.getElementById("tab-dshop"); if (!el) return;
     const n = feedList().length;
     el.innerHTML = `<div class="panel pad"><h2 style="margin:0 0 4px">D Shop link</h2>
-      <p class="note" style="margin:0">Sends your products' <b>names, sizes and rates</b> (code, description, HSN, unit, rate) to D Shop, the customer ordering app, automatically whenever products change here. D Shop keeps the rate in its admin-only area and shows customers only the <b>selling price</b> (rate × sell %, set in D Shop → Settings). <b>Not sent:</b> stock, suppliers, divisions, PIDs, customers.</p>
+      <p class="note" style="margin:0">Sends your products' <b>names, sizes and rates</b> (code, description, HSN, unit, rate) to D Shop, the customer ordering app, automatically whenever products change here. D Shop keeps the rate in its admin-only area and shows customers only the <b>selling price</b> (rate + sell %, set in D Shop → Settings). <b>Not sent:</b> stock, suppliers, divisions, PIDs, customers.</p>
       ${duser ? `<div class="row" style="gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><span class="pill good">Connected</span><span class="note">D Shop database <span class="code">dhh-dshop</span>${remoteInfo ? ` · last received ${esc(new Date(remoteInfo.at).toLocaleString("en-IN"))}` : ""}</span>
         <button class="btn" id="dsSend">Send now</button><button class="btn" id="dsOut">Disconnect</button></div>
         <div class="note" id="dsState" style="margin-top:8px">${state}</div>`
