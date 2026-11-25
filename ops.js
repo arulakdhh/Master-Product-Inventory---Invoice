@@ -396,7 +396,7 @@ async function receiptPdf(id) {
   try {
     const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "mm", format: "a5", orientation: "landscape" }); addFonts(doc);
     const W = 210, M = 12, RED = [192, 57, 43];
-    if (co.logo) { try { doc.addImage(co.logo, "PNG", M, 8, 16, 16); } catch (e) { } }
+    if (pdfLogo(co)[0]) { try { doc.addImage(...pdfLogo(co), M, 8, 16, 16); } catch (e) { } }
     doc.setFont("FreeSans", "bold"); doc.setFontSize(13); doc.setTextColor(34); doc.text(co.name, M + 20, 14); doc.setFont("FreeSans", "normal"); doc.setFontSize(7.5); doc.setTextColor(100);
     doc.text((co.address || "").replace(/\n/g, ", "), M + 20, 18.5, { maxWidth: 110 }); doc.text(`GSTIN: ${co.gstin}  |  ${co.phone}  |  ${co.email}`, M + 20, 25);
     doc.setFont("FreeSans", "bold"); doc.setFontSize(16); doc.setTextColor(...RED); doc.text(r.status === "cancelled" ? "RECEIPT (CANCELLED)" : "PAYMENT RECEIPT", W - M, 15, { align: "right" });

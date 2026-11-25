@@ -315,7 +315,7 @@ function dashPdf(D, G) {
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" }); addFonts(doc);
   const co = { ...DEFAULT_COMPANY, ...S.company }; const W = 297, M = 12, INK = [34, 34, 34], GREY = [102, 102, 102], BLUE = [42, 120, 214];
   const T = D.T; const pct = v => v == null ? "—" : (v * 100).toFixed(1) + "%";
-  const head = (title) => { if (co.logo) { try { doc.addImage(co.logo, "PNG", M, 8, 12, 12); } catch (e) { } } doc.setFont("FreeSans", "bold"); doc.setFontSize(14); doc.setTextColor(...INK); doc.text(title, M + 15, 14);
+  const head = (title) => { if (pdfLogo(co)[0]) { try { doc.addImage(...pdfLogo(co), M, 8, 12, 12); } catch (e) { } } doc.setFont("FreeSans", "bold"); doc.setFontSize(14); doc.setTextColor(...INK); doc.text(title, M + 15, 14);
     doc.setFont("FreeSans", "normal"); doc.setFontSize(8.5); doc.setTextColor(...GREY); doc.text(`${co.name} · ${D.R.label}${S.dash.div ? " · " + divName(S.dash.div) : " · all divisions"} · generated ${new Date().toLocaleString("en-IN")}`, M + 15, 19); };
   head("Sales analysis");
   const tiles = [["Turnover (excl. GST)", "₹ " + lakh(T.turnover), `${T.invoices} invoices · ${T.customers} customers`], ["Gross margin", "₹ " + lakh(T.margin), pct(T.marginPct) + " of turnover"], ["Incl. GST", "₹ " + lakh(T.gross), "GST ₹ " + lakh(T.gst)], ["Collections", "₹ " + lakh(T.collections), "Outstanding ₹ " + lakh(D.outstanding)], ["Stock at cost", "₹ " + lakh(D.stockValue), "At hospitals ₹ " + lakh(D.atHosp)], ["Forecast 3 months", "₹ " + lakh(D.fc.next.reduce((a, x) => a + x.value, 0)), D.fc.confidence + " confidence"]];

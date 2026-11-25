@@ -381,7 +381,7 @@ function stVisualAoA(v, rep) {
 function stPdf(rep) {
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" }); addFonts(doc); const co = { ...DEFAULT_COMPANY, ...S.company };
   const W = 297, Hh = 210, M = 10, gap = 5, colW = (W - 2 * M - 5 * gap) / 6; const DS = S._stDS || stDatasets(); const sl = rep.slicers || {};
-  const head = () => { if (co.logo) { try { doc.addImage(co.logo, "PNG", M, 7, 10, 10); } catch (e) { } } doc.setFont("FreeSans", "bold"); doc.setFontSize(13); doc.setTextColor(34); doc.text(rep.name, M + 13, 12.5);
+  const head = () => { if (pdfLogo(co)[0]) { try { doc.addImage(...pdfLogo(co), M, 7, 10, 10); } catch (e) { } } doc.setFont("FreeSans", "bold"); doc.setFontSize(13); doc.setTextColor(34); doc.text(rep.name, M + 13, 12.5);
     doc.setFont("FreeSans", "normal"); doc.setFontSize(8); doc.setTextColor(102); doc.text(`${co.name} · ${stRange(sl.range || "fy").label}${sl.company ? " · " + divName(sl.company) : ""}${sl.customer && S.customers[sl.customer] ? " · " + S.customers[sl.customer].name : ""} · ${new Date().toLocaleString("en-IN")}`, M + 13, 16.5); };
   head(); let x = M, y = 22, rowH = 0;
   for (const v of rep.visuals) {

@@ -4,25 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D Cart</title>
+<link rel="icon" type="image/png" href="dhh-logo.png">
+<meta name="theme-color" content="#c8102e">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Layout: app bar + tab strip, then one working surface per tab (toolbar → table). Ledger-like, dense, scannable. */
 :root{
   --bg:#f4f6f7; --surface:#ffffff; --ink:#17232b; --muted:#5d6b74; --line:#dde3e7;
-  --accent:#0b6e75; --accent-soft:#e1f1f2; --match:#b45309; --match-soft:#fdf1e3;
+  --accent:#c8102e; --accent-soft:#fde8ea; --match:#b45309; --match-soft:#fdf1e3;
   --good:#1d7a3e; --good-soft:#e5f4ea; --warn:#a15c00; --warn-soft:#fff3dc; --bad:#b42318; --bad-soft:#fdeceb;
   --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0f1619; --surface:#162126; --ink:#e3eaed; --muted:#93a3ab; --line:#2a3a41;
-  --accent:#4fb8bf; --accent-soft:#16363a; --match:#f0a050; --match-soft:#3a2a17;
+  --bg:#000000; --surface:#121212; --ink:#ededed; --muted:#a3a3a3; --line:#2b2b2b;
+  --accent:#ff5a5f; --accent-soft:#2e1214; --match:#f0a050; --match-soft:#3a2a17;
   --good:#5cc985; --good-soft:#173322; --warn:#f2b44c; --warn-soft:#3a2c12; --bad:#f07a6e; --bad-soft:#3d1c19; color-scheme:dark;}}
 :root[data-theme="dark"]{
-  --bg:#0f1619; --surface:#162126; --ink:#e3eaed; --muted:#93a3ab; --line:#2a3a41;
-  --accent:#4fb8bf; --accent-soft:#16363a; --match:#f0a050; --match-soft:#3a2a17;
+  --bg:#000000; --surface:#121212; --ink:#ededed; --muted:#a3a3a3; --line:#2b2b2b;
+  --accent:#ff5a5f; --accent-soft:#2e1214; --match:#f0a050; --match-soft:#3a2a17;
   --good:#5cc985; --good-soft:#173322; --warn:#f2b44c; --warn-soft:#3a2c12; --bad:#f07a6e; --bad-soft:#3d1c19; color-scheme:dark;}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
@@ -30,12 +32,13 @@ button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 header.app{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px 0}
 .titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+h1.brand{display:flex;align-items:center;gap:8px}h1.brand img{display:block;border-radius:6px}
 h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px}
 .pv span.good{color:#17663a}.pv span.bad{color:var(--bad,#b42318)}.pv span.warn{color:#8a5a00}:root[data-theme="dark"] .pv span.good{color:#4ade80}:root[data-theme="dark"] .pv span.warn{color:#facc15}
 .themesw{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface);align-self:center}
 .themesw button{border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer;display:flex;gap:5px;align-items:center}
-.themesw button[aria-pressed="true"]{background:var(--accent);color:#fff}:root[data-theme="dark"] .themesw button[aria-pressed="true"]{color:#062326}
+.themesw button[aria-pressed="true"]{background:var(--accent);color:#fff}:root[data-theme="dark"] .themesw button[aria-pressed="true"]{color:#000}
 .themesw button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .status{margin-left:auto;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
@@ -92,7 +95,7 @@ input[type=search],input[type=text],input:not([type]),input[type=number],input[t
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:500;white-space:nowrap}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-:root[data-theme="dark"] .btn.primary{color:#062326}
+:root[data-theme="dark"] .btn.primary{color:#000}
 .btn.danger{color:var(--bad)}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 label.chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-size:13px}
@@ -160,7 +163,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <body>
 <header class="app">
   <div class="titlerow">
-    <h1>D Cart</h1>
+    <h1 class="brand"><img src="dhh-logo.png" alt="" width="26" height="26">D Cart</h1>
     <span class="sub" id="subline">Product lines from supplier invoices</span>
     <span class="status"><span class="dot" id="dbdot"></span><span id="dbstatus">Connecting to database…</span></span>
     <div class="themesw" role="group" aria-label="Colour theme"><button type="button" data-theme-set="light" aria-pressed="false" title="Light theme">☀ Light</button><button type="button" data-theme-set="dark" aria-pressed="false" title="Dark theme">☾ Dark</button></div>
@@ -308,7 +311,7 @@ textarea{width:100%;min-height:120px;font-family:var(--font-mono);font-size:12px
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=2"></script>
-<script src="firebase-adapter.js?v=8"></script>
+<script src="firebase-adapter.js?v=9"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="lib/pdf.min.js"></script>
 <script src="parser.js"></script>
@@ -467,7 +470,7 @@ function render(){
   $("pageinfo").textContent=`Page ${S.page+1} of ${pages}`; $("prev").disabled=S.page===0; $("next").disabled=S.page>=pages-1;
   renderColPanel();
 }
-const DIVCOLORS={MLS:"#2b6cb0",MHC:"#0b6e75",MED:"#7b3fa0",MDG:"#b45309"};
+const DIVCOLORS={MLS:"#2b6cb0",MHC:"#0f766e",MED:"#7b3fa0",MDG:"#b45309"};
 function renderIdBar(){ if(S.tab==="pid") renderPid(); renderSelBar(); }
 function renderSelBar(){ const keys=new Set(S.items.map(r=>r.key)); [...S.sel].forEach(k=>{ if(!keys.has(k)) S.sel.delete(k); });
   $("selbar").classList.toggle("hidden", S.tab!=="lines"||!S.sel.size);
@@ -963,16 +966,15 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=18"></script>
-<script src="ops.js?v=4"></script>
-<script src="analytics.js?v=4"></script>
-<script src="studio.js?v=1"></script>
+<script src="sales.js?v=19"></script>
+<script src="ops.js?v=5"></script>
+<script src="analytics.js?v=5"></script>
+<script src="studio.js?v=2"></script>
 <script src="pricing.js?v=6"></script>
 <script src="cashflow.js?v=3"></script>
 <script src="groups.js?v=4"></script>
 <script src="billimport.js?v=1"></script>
 <script src="field-link.js?v=2"></script>
-<script src="dshop-link.js?v=3"></script>
 <script>
 /* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */
 (function(){
