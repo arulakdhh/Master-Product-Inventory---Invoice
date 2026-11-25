@@ -1,8 +1,10 @@
 /* =====================================================================
    D Cart → D Shop (customer ordering app, its own Firebase: dhh-dshop)
-   Sends the product NAMES and SIZES only (code, description, HSN, unit)
-   to D Shop, automatically whenever D Cart's product list changes.
-   No rates, stock, suppliers, divisions, PIDs or customers are sent.
+   Sends product names, sizes and purchase RATE (code, description, HSN,
+   unit, rate) to D Shop's admin-only area, automatically whenever D Cart's
+   products change. D Shop shows customers only the selling price
+   (rate × sell %), never the rate. No stock, suppliers, divisions, PIDs or
+   customers are sent.
    Connect once per computer with the D Shop admin password:
    Admin panel → D Shop link.
    ===================================================================== */
@@ -36,14 +38,14 @@
     if (feedUnsub) { feedUnsub(); feedUnsub = null; }
     if (duser) {
       feedUnsub = dfs.doc("private/dcartFeed").onSnapshot(s => { remoteSig = s.exists ? s.data().sig : null; remoteInfo = s.exists ? { count: s.data().count, at: s.data().updatedAt } : null; }, e => setState(`<b style="color:var(--bad)">D Shop refused access (${esc(e.code || e.message)}). This login isn't the D Shop admin.</b>`));
-      setState("Connected. Sending product names…"); schedule(1500);
+      setState("Connected. Sending products…"); schedule(1500);
     } else setState("Not connected to D Shop yet.");
     if (typeof S !== "undefined" && S.tab === "dshop") render();
   });
 
   /* ---------- product names and sizes only ---------- */
   function feedList() {
-    return (S.master || []).filter(m => m.mat && m.desc).map(m => ({ code: String(m.mat), desc: String(m.desc).trim(), hsn: String(m.hsn || ""), uom: String(m.uom || "") }))
+    return (S.master || []).filter(m => m.mat && m.desc).map(m => ({ code: String(m.mat), desc: String(m.desc).trim(), hsn: String(m.hsn || ""), uom: String(m.uom || ""), rate: Math.round((+m.rate || 0) * 100) / 100 }))
       .sort((a, b) => a.desc.localeCompare(b.desc, undefined, { numeric: true }));
   }
   function schedule(ms) { clearTimeout(timer); timer = setTimeout(() => send(false), ms || 4000); }
@@ -55,11 +57,11 @@
     const list = feedList();
     if (!list.length) return setState(`<b style="color:var(--bad)">No products to send yet.</b> Add supplier invoices first.`);
     const sig = hash(JSON.stringify(list));
-    if (!force && (sig === lastSig || sig === remoteSig)) { lastSig = sig; return setState(`✅ D Shop has D Cart's product names: <b>${list.length}</b> products, names and sizes only.`); }
+    if (!force && (sig === lastSig || sig === remoteSig)) { lastSig = sig; return setState(`✅ D Shop has D Cart's products: <b>${list.length}</b> names, sizes and rates.`); }
     try {
       await dfs.doc("private/dcartFeed").set({ list, count: list.length, sig, source: "D Cart", updatedAt: new Date().toISOString(), by: S.myEmail || "" });
       lastSig = sig; remoteSig = sig;
-      setState(`✅ Sent to D Shop: <b>${list.length}</b> product names and sizes (just now). New ones appear in D Shop → Products; give them a rate there.`);
+      setState(`✅ Sent to D Shop: <b>${list.length}</b> products with names, sizes and rates (just now). D Shop prices them automatically (rate × sell %).`);
     } catch (e) {
       setState(`<b style="color:var(--bad)">Couldn't send to D Shop: ${esc(e.code || e.message || String(e))}.</b> ${/permission/i.test(e.code || e.message || "") ? "Connect with the D Shop admin password, and check D Shop's Firestore rules are published." : ""}`);
     }
@@ -79,7 +81,7 @@
     const el = document.getElementById("tab-dshop"); if (!el) return;
     const n = feedList().length;
     el.innerHTML = `<div class="panel pad"><h2 style="margin:0 0 4px">D Shop link</h2>
-      <p class="note" style="margin:0">Sends your product <b>names and sizes</b> (code, description, HSN, unit) to D Shop, the customer ordering app, automatically whenever products change here. <b>Nothing else is sent:</b> no rates, stock, suppliers, divisions, PIDs or customers. In D Shop you set each product's rate or price and stock; products without a price stay hidden from customers.</p>
+      <p class="note" style="margin:0">Sends your products' <b>names, sizes and rates</b> (code, description, HSN, unit, rate) to D Shop, the customer ordering app, automatically whenever products change here. D Shop keeps the rate in its admin-only area and shows customers only the <b>selling price</b> (rate × sell %, set in D Shop → Settings). <b>Not sent:</b> stock, suppliers, divisions, PIDs, customers.</p>
       ${duser ? `<div class="row" style="gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><span class="pill good">Connected</span><span class="note">D Shop database <span class="code">dhh-dshop</span>${remoteInfo ? ` · last received ${esc(new Date(remoteInfo.at).toLocaleString("en-IN"))}` : ""}</span>
         <button class="btn" id="dsSend">Send now</button><button class="btn" id="dsOut">Disconnect</button></div>
         <div class="note" id="dsState" style="margin-top:8px">${state}</div>`
