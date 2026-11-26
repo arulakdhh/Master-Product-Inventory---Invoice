@@ -18,6 +18,17 @@
   function batchScore(bill, stock) { const a = nz(bill), b = nz(stock); if (!a || !b) return 0; if (a === b) return 3;
     const x = bz(bill), y = bz(stock); if (x === y) return 2;
     if (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x) || lev1(x, y))) return 1; return 0; }
+  /* Stock that could be this bill line: the same material code, plus — when the bill's code is missing or
+     typed differently (TPRAQ-01 / TPRAQ1-01, GGTSR01 / GGTFSR-01, HBAT1A / HBATIA) — any PID whose batch
+     is the same as the batch on the bill. A batch number is specific enough to identify the product. */
+  const codeless = c => { const x = nz(c); return !x || /^0+$/.test(x) || x.length < 4; };
+  const codeSim = (a, b) => { const x = bz(a), y = bz(b); return x === y || lev1(x, y) || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x))); };
+  function poolFor(l, byMat) {
+    const own = codeless(l.mat) ? [] : (byMat[nz(l.mat)] || []); const bb = l.billBatch || l.batch;
+    if (!bb || nz(bb).length < 5) return own;
+    const extra = S.items.filter(r => !own.includes(r) && r.batch && (batchScore(bb, r.batch) >= 2 ? (codeless(l.mat) || codeSim(l.mat, r.mat)) : (codeless(l.mat) && nz(bb).length >= 8 && batchScore(bb, r.batch) >= 1)));
+    return own.concat(extra);
+  }
   /* Order stock for a bill line: best batch match first, then the oldest purchase. Stock bought after the bill
      is skipped, except the same batch (a supplier invoice can be dated a little after the goods arrived): up to 31 days. */
   function candidatesFor(list, l, billYmd) {
@@ -36,7 +47,7 @@
       const exists = !!S.sales[impId(b.billNo)] || Object.values(S.sales).some(d => d.no === b.billNo && d.status !== "cancelled");
       const out = []; let fromStock = 0, noStock = 0, noStockValue = 0;
       for (const l of b.lines) {
-        const cands = candidatesFor(byMat[nz(l.mat)], l, b.date.replace(/-/g, ""));
+        const cands = candidatesFor(poolFor(l, byMat), l, b.date.replace(/-/g, ""));
         const refCost = cands.length ? costOfItem(cands[0]) : 0;
         for (const [need0, free] of [[+l.qty || 0, false], [+l.free || 0, true]]) {
           let need = need0; if (!(need > 0)) continue;
@@ -45,7 +56,7 @@
             if (need <= 0) break;
             const a = avail(r); if (a <= 0) continue; const q = Math.min(a, need);
             used[r.key] = r2((used[r.key] || 0) + q); need = r2(need - q); fromStock += q;
-            out.push({ ...base, billBatch: l.batch || "", key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || l.batch || "", serial: r.serial || "", exp: r.exp || l.exp || "", hsn: r.hsn || base.hsn, uom: r.uom || "", qty: q, cost: costOfItem(r),
+            out.push({ ...base, mat: r.mat || base.mat, billMat: base.mat, billBatch: l.batch || "", key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || l.batch || "", serial: r.serial || "", exp: r.exp || l.exp || "", hsn: r.hsn || base.hsn, uom: r.uom || "", qty: q, cost: costOfItem(r),
               remarks: [free ? "Free" : "", l.batch && nz(r.batch) !== nz(l.batch) ? `bill batch ${l.batch}` : ""].filter(Boolean).join(" · ") });
           }
           if (need > 0) { noStock += need; if (!free) noStockValue += r2(need * base.rate * (1 - base.discPct / 100));
@@ -145,11 +156,11 @@
         if (!mode) { lines.push(orig); continue; } any = true;
         const qty = +orig.qty || 0; const l = { ...orig, batch: bb };
         if (mode === "B") sold[cur.key] = r2((sold[cur.key] || 0) - qty);          // release its current stock while we look
-        let cands = candidatesFor(byMat[nz(l.mat)], l, bd);
+        let cands = candidatesFor(poolFor(l, byMat), l, bd);
         if (mode === "B") cands = cands.filter(r => r.key !== cur.key && batchScore(bb, r.batch) > curScore);
         let need = qty; const parts = []; const take = {};
         for (const r of cands) { if (need <= 0) break; const a = avail(r); if (a <= 0) continue; const q = Math.min(a, need); take[r.key] = q; need = r2(need - q);
-          parts.push({ ...orig, key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || bb, billBatch: bb, serial: r.serial || "", exp: r.exp || orig.exp || "", hsn: r.hsn || orig.hsn, uom: r.uom || orig.uom || "", qty: q, cost: costOfItem(r), noStock: false,
+          parts.push({ ...orig, mat: r.mat || orig.mat, billMat: orig.billMat || orig.mat || "", key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || bb, billBatch: bb, serial: r.serial || "", exp: r.exp || orig.exp || "", hsn: r.hsn || orig.hsn, uom: r.uom || orig.uom || "", qty: q, cost: costOfItem(r), noStock: false,
             remarks: [orig.rate ? "" : "Free", bb && nz(r.batch) !== nz(bb) ? `bill batch ${bb}` : "", mode === "A" ? "linked later" : "re-matched by batch"].filter(Boolean).join(" · ") }); }
         const restore = () => { if (mode === "B") sold[cur.key] = r2((sold[cur.key] || 0) + qty); };
         if (!parts.length) { restore(); lines.push(orig); if (mode === "A") left += qty; continue; }
