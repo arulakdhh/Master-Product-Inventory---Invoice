@@ -27,7 +27,10 @@ function canViewPanel(k) { const m = S.me; if (!m) return false; if (m.isAdmin) 
 function canEditPanel(k) { const m = S.me; if (!m) return false; if (m.isAdmin) return true; if (k === "admin") return false; return (m.perms || {})[k] === "edit"; }
 function panelOfView(v) { const p = PANELS.find(p => p.subs.some(s => s[0] === v)); return p ? p.key : null; }
 
+/* View-only panels: hide the controls that change data, instead of showing them greyed out. */
+function applyRO() { document.body.classList.toggle("ro", !!S.me && !S.canWrite); }
 function renderNav() {
+  applyRO();
   const nav = $("panelnav"), sub = $("subnav");
   const vis = PANELS.filter(p => canViewPanel(p.key));
   nav.innerHTML = vis.map(p => `<button role="tab" data-panel="${p.key}" aria-selected="${S.panel === p.key}">${esc(p.label)}</button>`).join("");
@@ -504,5 +507,5 @@ setView(FIREBASE_MODE ? null : "invoice", FIREBASE_MODE ? null : "pid");
   sub("purchaseOrders", "pos", ["po"]);
   sub("receipts", "receipts", ["payfollow", "payrecv", "customers", "salesdash", "studio"]);
   sub("followups", "followups", ["payfollow"]);
-  const wait = setInterval(() => { if (S.db) { clearInterval(wait); if (S.me) { S.canWrite = canEditPanel(S.panel); render(); } } }, 300);
+  const wait = setInterval(() => { if (S.db) { clearInterval(wait); if (S.me) { S.canWrite = canEditPanel(S.panel); applyRO(); render(); } } }, 300);
 })();
