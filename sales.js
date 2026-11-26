@@ -44,7 +44,18 @@ function soldMap(exceptId) {
   for (const [id, d] of Object.entries(S.sales)) { if (id === exceptId || !lineDeducts(d)) continue; for (const l of d.lines || []) { const q = d.type === "DC" ? r2((l.qty || 0) - (l.returnedQty || 0)) : l.qty; m[l.key] = (m[l.key] || 0) + q; } }
   return m;
 }
-function computeStock(items) { const m = soldMap(); for (const r of items) { r.soldQty = m[r.key] || 0; r.availQty = r2(r.qty - r.soldQty); } }
+function computeStock(items) {
+  const m = soldMap();
+  // which DHH bills / challans each purchase line went out on (shown as Inventory columns)
+  const out = {};
+  for (const d of Object.values(S.sales || {})) { if (!lineDeducts(d)) continue;
+    for (const l of d.lines || []) { if (!l.key) continue; const q = d.type === "DC" ? r2((l.qty || 0) - (l.returnedQty || 0)) : (l.qty || 0); if (q <= 0) continue;
+      (out[l.key] ||= []).push({ no: d.no, date: d.date, cust: d.customer?.name || "", q, bb: l.billBatch || ((String(l.remarks || "").match(/bill batch (\S+)/) || [])[1]) || l.batch || "" }); } }
+  for (const r of items) { r.soldQty = m[r.key] || 0; r.availQty = r2(r.qty - r.soldQty);
+    const o = (out[r.key] || []).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const u = a => [...new Set(a.filter(Boolean))].join(", ");
+    r.dhhBills = u(o.map(x => x.no + (o.length > 1 ? ` (${x.q})` : ""))); r.dhhBillDates = u(o.map(x => dmy(x.date))); r.dhhCustomers = u(o.map(x => x.cust)); r.dhhBillBatch = u(o.map(x => x.bb)); }
+}
 
 /* ---------- money ---------- */
 function calcLine(l, intra, o) {

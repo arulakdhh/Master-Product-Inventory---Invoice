@@ -376,6 +376,7 @@ const LINE_FIELDS = [
   ["hsn","HSN/SAC Code","HSN code","t"],["mat","Material Code","Supplier's product code","c"],
   ["desc","Description","Description of goods","d"],["batch","Batch No.","Batch / lot number","c"],
   ["serial","Serial No.","Serial number (implants)","c"],["exp","Expiry Date","Expiry date (dd.mm.yyyy)","t"],
+  ["dhhBills","DHH Bill No.","DHH tax invoices / delivery challans this line went out on (pieces in brackets when more than one)","t"],["dhhBillDates","DHH Bill Date","Dates of those bills","t"],["dhhBillBatch","Batch on Bill","Batch number printed on those bills (compare with Batch No.)","c"],["dhhCustomers","Sold To","Customer(s) on those bills","d"],
   ["uom","UOM","Unit of measure","t"],["qty","QTY","Quantity","n0"],["mrp","MRP","Maximum retail price per unit","n2"],
   ["rate","Rate","Billed rate per unit before discount","n2"],["basic","Basic Amount","QTY × Rate","n2"],
   ["disc","Discount Amount","Discount on the line","n2"],["discPct","Discount %","Discount ÷ Basic","p"],
@@ -392,7 +393,7 @@ const MASTER_FIELDS = [
   ["netRate","Net Rate / Unit","Latest taxable value per unit","n2"],["lines","Lines","Invoice lines for this product","n0"],
   ["totalQty","Total QTY","Units received","n0"],["soldQty","QTY Sold","Units sold or out on challan","n0"],["availQty","QTY Available","Units in stock","n0"],["totalTaxable","Total Taxable","Taxable value received","n2"],
   ["totalIgst","Total IGST","IGST paid","n2"],["batches","Batch Nos.","All batch numbers","d"],
-  ["serials","Serial Nos.","All serial numbers","d"],["nearestExp","Nearest Expiry","Earliest expiry date","t"],
+  ["serials","Serial Nos.","All serial numbers","d"],["dhhBills","DHH Bill Nos.","DHH bills / challans this product went out on","d"],["dhhCustomers","Sold To","Customers on those bills","d"],["nearestExp","Nearest Expiry","Earliest expiry date","t"],
   ["invoices","Invoices","Invoice numbers","t"],["lastInvoiceDate","Last Invoice Date","Most recent invoice date","t"]
 ];
 const DEFAULT_PRESETS = [
@@ -437,14 +438,15 @@ function rebuild(){
   const g={};
   for(const r of items){
     const k=r.mat; const d=toDate(r.invoiceDate);
-    const m=g[k] ||= {_d:new Set(),_ids:[],mat:k,desc:r.desc,hsn:r.hsn,uom:r.uom,lines:0,totalQty:0,totalTaxable:0,totalIgst:0,_b:new Set(),_s:new Set(),_i:new Set(),_last:null,nearestExp:"",_ne:null};
+    const m=g[k] ||= {_bl:new Set(),_cu:new Set(),_d:new Set(),_ids:[],mat:k,desc:r.desc,hsn:r.hsn,uom:r.uom,lines:0,totalQty:0,totalTaxable:0,totalIgst:0,_b:new Set(),_s:new Set(),_i:new Set(),_last:null,nearestExp:"",_ne:null};
     if(r.divCode) m._d.add(r.divCode); if(r.dhhId) m._ids.push(r.dhhId);
     m.lines++; m.totalQty+=r.qty; m.soldQty=(m.soldQty||0)+r.soldQty; m.availQty=r2((m.availQty||0)+r.availQty); m.totalTaxable=r2(m.totalTaxable+r.taxable); m.totalIgst=r2(m.totalIgst+r.igst);
     if(r.batch) m._b.add(r.batch); if(r.serial) m._s.add(r.serial); m._i.add(r.invoiceNo);
+    (r.dhhBills||"").split(", ").filter(Boolean).forEach(x=>m._bl.add(x.replace(/ \(.*\)$/,""))); (r.dhhCustomers||"").split(", ").filter(Boolean).forEach(x=>m._cu.add(x));
     if(!m._last || d>=m._last){ m._last=d; m.lastInvoiceDate=r.invoiceDate; m.desc=r.desc; m.mrp=r.mrp; m.rate=r.rate; m.discPct=r.discPct; m.netRate=r.netRate; m.igstRate=r.igstRate; m.hsn=r.hsn; m.uom=r.uom; }
     const e=toDate(r.exp); if(e && (!m._ne || e<m._ne)){ m._ne=e; m.nearestExp=r.exp; }
   }
-  S.master=Object.values(g).map(m=>({...m,divCodes:[...m._d].join(", "),dhhIds:m._ids.join(", "),batches:[...m._b].join(", "),serials:[...m._s].join(", "),invoices:[...m._i].join(", ")}));
+  S.master=Object.values(g).map(m=>({...m,divCodes:[...m._d].join(", "),dhhIds:m._ids.join(", "),batches:[...m._b].join(", "),serials:[...m._s].join(", "),invoices:[...m._i].join(", "),dhhBills:[...m._bl].join(", "),dhhCustomers:[...m._cu].join(", ")}));
   S.master.forEach(m=>{m.matchCount=m.lines});
   fillFilters(); render();
 }
@@ -477,7 +479,7 @@ function filtered(){
     if(fe){ const e=toDate(isM? r.nearestExp : r.exp);
       if(fe==="none"){ if(e) return false; } else if(!e) return false;
       else if(fe==="expired"){ if(e>=now) return false; } else if(e>lim) return false; }
-    if(q){ const hay=(isM? [r.mat,r.desc,r.batches,r.serials,r.hsn,r.dhhIds] : [r.mat,r.desc,r.batch,r.serial,r.hsn,r.invoiceNo,r.dhhId]).join(" ").toLowerCase();
+    if(q){ const hay=(isM? [r.mat,r.desc,r.batches,r.serials,r.hsn,r.dhhIds,r.dhhBills,r.dhhCustomers] : [r.mat,r.desc,r.batch,r.serial,r.hsn,r.invoiceNo,r.dhhId,r.dhhBills,r.dhhCustomers]).join(" ").toLowerCase();
       if(!q.split(/\s+/).every(w=>hay.includes(w))) return false; }
     return true;
   });
@@ -508,6 +510,7 @@ function render(){
     if(t==="id") return `<td class="dhh">${r.dhhId?esc(r.dhhId)+(r.idConflict?' <span class="pill bad" title="This line changed after its ID was issued">check</span>':""):'<span class="lock">—</span>'}</td>`;
     if(t==="dv") return `<td>${r.divCode?`<span class="divtag">${esc(r.divCode)}</span>`+(r.dhhId?' <span class="lock" title="Locked: ID issued">🔒</span>':""):'<span class="lock">not set</span>'}</td>`;
     if(k==="mat") return `<td class="code"><a class="codelink" data-code="${esc(r.mat)}">${esc(r.mat)}</a></td>`;
+    if(k==="dhhBillBatch"){ const nzb=s=>String(s||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/O/g,"0"); const bad=(r[k]||"").split(", ").filter(Boolean).some(b=>nzb(b)!==nzb(r.batch)); return `<td class="code"${bad?` style="color:var(--warn);font-weight:600" title="Batch on the bill differs from this PID's batch (${esc(r.batch||"")})"`:""}>${esc(r[k]||"")}${bad?" ⚠":""}</td>`; }
     if(k==="matchCount"||k==="lines") return `<td class="num">${r[k]>1?`<span class="badge" data-code="${esc(r.mat)}" title="Show all lines with this code">×${r[k]}</span>`:r[k]}</td>`;
     const cls = t==="d"?"desc": t==="c"?"code": /^n|p/.test(t)?"num":"";
     return `<td class="${cls}">${fmt(r[k],t)}</td>`; }).join("")+"</tr>").join("");
@@ -1013,7 +1016,7 @@ render();
   db.collection("presets").onSnapshot(s=>{ S.presets=s.docs.map(d=>({id:d.id,...d.data()})); renderColPanel(); }, ()=>{});
 })();
 </script>
-<script src="sales.js?v=20"></script>
+<script src="sales.js?v=21"></script>
 <script src="ops.js?v=6"></script>
 <script src="analytics.js?v=5"></script>
 <script src="studio.js?v=2"></script>
