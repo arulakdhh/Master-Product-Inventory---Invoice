@@ -32,6 +32,8 @@ button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 header.app{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px 0}
 .titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+#tbl tbody tr[data-key],#tbl tbody tr[data-mat]{cursor:pointer}
+#tbl tbody tr[data-key]:hover td,#tbl tbody tr[data-mat]:hover td{background:var(--accent-soft)}
 h1.brand{display:flex;align-items:center;gap:8px}h1.brand img{display:block;border-radius:6px}
 h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px}
@@ -456,7 +458,7 @@ function render(){
   const allSel = !isM && rows.length>0 && rows.every(r=>S.sel.has(r.key));
   $("tbl").tHead.innerHTML="<tr>"+(isM||!S.canWrite?"":`<th class="sel"><input type="checkbox" id="selAll" aria-label="Select all lines matching the filters" ${allSel?"checked":""}></th>`)+cols.map(f=>`<th class="${/^n|p/.test(f[3])?"num":""}" data-k="${f[0]}" title="${esc(f[2])}">${esc(f[1])}${S.sort&&S.sort.k===f[0]?(S.sort.dir>0?" ▲":" ▼"):""}</th>`).join("")+"</tr>";
   if(!S.items.length){ $("tbl").tBodies[0].innerHTML=`<tr><td class="empty" colspan="${cols.length}">${S.loaded?"No invoices in the database yet. Open <b>Invoices &amp; import</b> to load or add one.":"Loading…"}</td></tr>`; }
-  else $("tbl").tBodies[0].innerHTML = slice.map(r=>`<tr class="${r.matchCount>1?"match":""}">`+(isM||!S.canWrite?"":`<td class="sel"><input type="checkbox" data-sel="${esc(r.key)}" aria-label="Select line ${esc(r.sr)} of ${esc(r.invoiceNo)}" ${S.sel.has(r.key)?"checked":""}></td>`)+cols.map(f=>{
+  else $("tbl").tBodies[0].innerHTML = slice.map(r=>`<tr class="${r.matchCount>1?"match":""}" ${isM?`data-mat="${esc(r.mat)}"`:`data-key="${esc(r.key)}"`} title="Click to see where this came from and where it went">`+(isM||!S.canWrite?"":`<td class="sel"><input type="checkbox" data-sel="${esc(r.key)}" aria-label="Select line ${esc(r.sr)} of ${esc(r.invoiceNo)}" ${S.sel.has(r.key)?"checked":""}></td>`)+cols.map(f=>{
     const k=f[0], t=f[3];
     if(t==="id") return `<td class="dhh">${r.dhhId?esc(r.dhhId)+(r.idConflict?' <span class="pill bad" title="This line changed after its ID was issued">check</span>':""):'<span class="lock">—</span>'}</td>`;
     if(t==="dv") return `<td>${r.divCode?`<span class="divtag">${esc(r.divCode)}</span>`+(r.dhhId?' <span class="lock" title="Locked: ID issued">🔒</span>':""):'<span class="lock">not set</span>'}</td>`;
@@ -974,6 +976,7 @@ render();
 <script src="cashflow.js?v=3"></script>
 <script src="groups.js?v=4"></script>
 <script src="billimport.js?v=2"></script>
+<script src="trace.js?v=1"></script>
 <script src="field-link.js?v=2"></script>
 <script>
 /* Light / dark switch (top right). Remembers your choice on this device; until you pick, it follows the computer's setting. */
