@@ -91,7 +91,7 @@
     box.innerHTML = h;
   }
 
-  window.openBillImport = function () { const box = $("impBox"); if (!box) return; box.classList.toggle("hidden"); if (box.dataset.bound !== "1") { box.dataset.bound = "1";
+  window.openBillImport = function () { const box = $("impBox"); if (!box) return; box.onclick = null; box.classList.toggle("hidden"); if (box.dataset.bound !== "1") { box.dataset.bound = "1";
     box.addEventListener("click", e => { const b = e.target.closest("[data-bi]"); if (!b) return; const a = b.dataset.bi;
       if (a === "close") { box.classList.add("hidden"); return; }
       if (a === "pick") { $("biFile").click(); return; }
@@ -101,5 +101,75 @@
         if (!d || d.kind !== "dcart-sales-bills" || !Array.isArray(d.bills)) { BI.plan = null; BI.msg = "That isn't a D Cart sales-bills file."; return draw(); }
         BI.file = f.name; BI.msg = ""; BI.plan = buildPlan(d); draw(); }); } }); }
     draw(); };
+
+  /* ---------- Link past bills to stock ----------
+     Lines of imported bills that had no stock when they were imported ("noStock") are linked to stock
+     uploaded later: same batch first, then the oldest purchase, only stock bought on or before the bill date.
+     Amounts on the bills stay the same; only the stock link changes. */
+  const LK = { plan: null, busy: false, msg: "" };
+  function linkPlan() {
+    const sold = soldMap(); const used = {}; const byMat = {};
+    for (const r of S.items) { const k = nz(r.mat); if (k) (byMat[k] ||= []).push(r); }
+    const avail = r => r2(r.qty - (sold[r.key] || 0) - (used[r.key] || 0));
+    const docs = Object.entries(S.sales).filter(([, d]) => d.type === "INV" && d.imported && d.status !== "cancelled" && (d.lines || []).some(l => l.noStock))
+      .sort((a, b) => (a[1].date + a[1].no).localeCompare(b[1].date + b[1].no));
+    const out = []; let skippedRound = 0;
+    for (const [id, d] of docs) {
+      const bd = String(d.date || "").replace(/-/g, ""); const lines = []; let linked = 0, left = 0, changed = false;
+      for (const l of d.lines) {
+        if (!l.noStock) { lines.push(l); continue; }
+        const bt = nz(l.batch);
+        const cands = (byMat[nz(l.mat)] || []).filter(r => { const pd = ymd(r.invoiceDate); return pd === "99999999" || pd <= bd; })
+          .sort((x, y) => (nz(y.batch) === bt) - (nz(x.batch) === bt) || ymd(x.invoiceDate).localeCompare(ymd(y.invoiceDate)) || String(x.key).localeCompare(String(y.key)));
+        let need = +l.qty || 0; const parts = []; const take = {};
+        for (const r of cands) { if (need <= 0) break; const a = avail(r); if (a <= 0) continue; const q = Math.min(a, need); take[r.key] = q; need = r2(need - q);
+          parts.push({ ...l, key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || l.batch || "", serial: r.serial || "", exp: r.exp || l.exp || "", hsn: r.hsn || l.hsn, uom: r.uom || l.uom || "", qty: q, cost: costOfItem(r), noStock: false,
+            remarks: [l.rate ? "" : "Free", l.batch && nz(r.batch) !== bt ? `bill batch ${l.batch}` : "", "linked later"].filter(Boolean).join(" · ") }); }
+        if (!parts.length) { lines.push(l); left += +l.qty || 0; continue; }
+        if (need > 0) parts.push({ ...l, qty: need });
+        const done = parts.map(p => { const c = calcLine(p, true, {}); const cv = r2((+p.cost || 0) * p.qty); return { ...p, ...c, sellPct: p.cost && p.rate ? markupPct(p.cost, p.rate) : "", costValue: cv, profit: r2(c.taxable - cv) }; });
+        const before = calcLine(l, true, {}).taxable, after = r2(done.reduce((a, p) => a + p.taxable, 0));
+        if (Math.abs(before - after) > 0.001) { lines.push(l); left += +l.qty || 0; skippedRound++; continue; }   // a split would change the bill by paise: leave it
+        for (const [k, q] of Object.entries(take)) used[k] = r2((used[k] || 0) + q);
+        linked += r2((+l.qty || 0) - need); left += need; changed = true; lines.push(...done);
+      }
+      if (!changed) continue;
+      const totals = calcDoc(lines, true, "INV", {});
+      if (totals.grand !== d.totals.grand || Math.abs(totals.taxable - d.totals.taxable) > 0.001) { skippedRound++; continue; }
+      out.push({ id, d, lines, totals, linked, left });
+    }
+    return { out, skippedRound, docs: docs.length };
+  }
+  async function linkRun() {
+    const P = LK.plan.out; LK.busy = true; let n = 0; drawLink();
+    try { for (const p of P) { const doc = { ...p.d, lines: p.lines, totals: p.totals, relinkedAt: new Date().toISOString() };
+        await S.db.doc(`sales/${p.id}`).set(doc); S.sales[p.id] = doc; n++; LK.msg = `Saving… ${n} of ${P.length}`; drawLink(); }
+      LK.msg = `Done: ${n} bill${n === 1 ? "" : "s"} updated, ${inr(P.reduce((a, p) => a + p.linked, 0), 0)} pieces now taken out of stock.`; LK.plan = null;
+    } catch (e) { LK.msg = `Stopped after ${n} bill${n === 1 ? "" : "s"}: ${e.message || e.code}. Click "Check" again; bills already linked are skipped.`; }
+    LK.busy = false; if (typeof computeStock === "function") computeStock(S.items); drawLink(); if (typeof renderSalesList === "function" && $("salestbl")) renderSalesList();
+  }
+  function drawLink() {
+    const box = $("impBox"); if (!box) return; const P = LK.plan;
+    let h = `<div class="row" style="justify-content:space-between"><h3 style="margin:0">Link past bills to stock</h3><button class="btn" data-lk="close">Close</button></div>
+      <p class="note" style="margin:6px 0 10px">Imported bill lines that had no stock in D Cart are linked to supplier invoices uploaded since: same batch first, then the oldest purchase, only stock bought on or before the bill date. Bill amounts don't change. Nothing is saved until you click the button below.</p>
+      <div class="row"><button class="btn primary" data-lk="check" ${LK.busy ? "disabled" : ""}>Check</button></div>`;
+    if (P) {
+      const pcs = P.out.reduce((a, p) => a + p.linked, 0), left = P.out.reduce((a, p) => a + p.left, 0);
+      h += `<div class="row" style="gap:18px;margin:12px 0;flex-wrap:wrap"><div><div class="note">Bills to update</div><b>${P.out.length}</b> <span class="note">of ${P.docs} with unlinked lines</span></div>
+        <div><div class="note">Pieces to take out of stock</div><b>${inr(pcs, 0)}</b></div><div><div class="note">Still without stock on those bills</div><b>${inr(left, 0)}</b></div></div>
+        ${P.skippedRound ? `<p class="note">${P.skippedRound} line${P.skippedRound === 1 ? "" : "s"} left as they are, because splitting them would change a bill by a few paise.</p>` : ""}
+        ${P.out.length ? `<details style="margin:8px 0"><summary class="note" style="cursor:pointer">See each bill</summary><div class="tablewrap" style="max-height:360px"><table><thead><tr><th>Bill</th><th>Date</th><th>Customer</th><th class="num">Pieces linked</th><th class="num">Still no stock</th></tr></thead><tbody>
+        ${P.out.map(p => `<tr><td class="code">${esc(p.d.no)}</td><td>${esc(dmy(p.d.date))}</td><td>${esc(p.d.customer?.name || "")}</td><td class="num">${inr(p.linked, 0)}</td><td class="num">${inr(p.left, 0)}</td></tr>`).join("")}</tbody></table></div></details>
+        <div class="row"><button class="btn primary" data-lk="go" ${LK.busy ? "disabled" : ""}>Link ${inr(pcs, 0)} pieces on ${P.out.length} bill${P.out.length === 1 ? "" : "s"}</button></div>` : `<p class="note">Nothing to link: no stock in D Cart matches the unlinked lines yet.</p>`}`;
+    }
+    if (LK.msg) h += `<p class="note" style="margin:10px 0 0" role="status">${esc(LK.msg)}</p>`;
+    box.innerHTML = h;
+  }
+  window.openBillLink = function () { const box = $("impBox"); if (!box) return; box.classList.remove("hidden"); LK.plan = null; LK.msg = "";
+    box.onclick = e => { const b = e.target.closest("[data-lk]"); if (!b) return; const a = b.dataset.lk;
+      if (a === "close") { box.classList.add("hidden"); box.onclick = null; return; }
+      if (a === "check") { LK.plan = linkPlan(); LK.msg = ""; drawLink(); }
+      if (a === "go") linkRun(); };
+    drawLink(); };
   window.biImpId = impId;
 })();
