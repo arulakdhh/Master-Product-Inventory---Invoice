@@ -11,6 +11,7 @@
     near: ["Typing slip", "warn", "Almost the same (a character missing, I typed as 1, a prefix cut off). Check the bill and correct it if needed."],
     diff: ["Different batch", "bad", "Marked sold on a PID of another batch. Run Link past bills to stock to move or release it, or use Pick PID."],
     nostock: ["No stock in D Cart", "bad", "Not marked sold on any PID yet. Upload the supplier invoice and run Link past bills to stock, or use Pick PID."],
+    hand: ["Confirmed by hand", "good", "The bill's batch was typed differently, and you picked this PID by hand in Pick PID."],
     nobatch: ["No batch on bill", "", "The bill line has no batch number to compare."]
   };
   const A = { f: "", q: "", only: "" };
@@ -25,9 +26,10 @@
       (d.lines || []).forEach((l, li) => {
         const it = l.key ? byKey[l.key] : null; const bb = billBatch(l);
         const st = !it ? "nostock" : !bb ? "nobatch" : nz(bb) === nz(it.batch) ? "exact" : bz(bb) === bz(it.batch) || bz(bb).includes(bz(it.batch)) || bz(it.batch).includes(bz(bb)) || lev1(bz(bb), bz(it.batch)) ? "near" : "diff";
+        const stF = it && l.handPicked && (st === "near" || st === "diff") ? "hand" : st;
         out.push({ id, no: d.no, type: d.type, date: d.date, cust: d.customer?.name || "", mat: l.mat || "", desc: l.desc || "", billBatch: bb,
           pid: it ? it.dhhId || "" : "", pidBatch: it ? it.batch || "" : "", supInv: it ? it.invoiceNo : "", qty: +l.qty || 0, free: !l.rate,
-          bought: it ? it.qty : null, sold: it ? it.soldQty : null, left: it ? it.availQty : null, st, li, hand: !!l.handPicked, rate: l.rate });
+          bought: it ? it.qty : null, sold: it ? it.soldQty : null, left: it ? it.availQty : null, st: stF, li, hand: !!l.handPicked, rate: l.rate });
       });
     }
     return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.no).localeCompare(String(a.no)));
@@ -78,7 +80,7 @@
     const tile = (k, n) => `<button class="tile" data-auf="${k}" style="text-align:left;cursor:pointer${A.f === k ? ";outline:2px solid var(--accent)" : ""}" title="${esc(ST[k][2])}"><div class="k">${esc(ST[k][0])}</div><div class="v">${inr(n, 0)}</div><div class="note">bill lines</div></button>`;
     el.innerHTML = `<div class="panel pad"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Batch audit</h2><button class="btn" data-audl>Download (Excel)</button></div>
       <p class="note" style="margin:6px 0 0">Every line of your tax invoices and delivery challans, with the <b>batch printed on the bill</b> next to the <b>batch of the PID</b> it took from stock, and how many of that PID are <b>still in stock</b>. Click a box to show only those lines. Lines that aren't on their exact batch can be fixed with <b>Pick PID</b>.</p>${A.msg ? `<p class="note" role="status" style="margin-top:10px;color:var(--accent)">${esc(A.msg)}</p>` : ""}</div>
-      <div class="tiles">${["exact", "near", "diff", "nostock"].map(k => tile(k, cnt(k))).join("")}</div>
+      <div class="tiles">${["exact", "hand", "near", "diff", "nostock"].map(k => tile(k, cnt(k))).join("")}</div>
       <div class="panel"><div class="toolbar"><input type="search" id="auQ" placeholder="Search bill no., customer, product, batch, PID…" value="${esc(A.q)}" aria-label="Search the audit">
         <select id="auF" aria-label="Match"><option value="">All lines (${all.length})</option>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${A.f === k ? "selected" : ""}>${esc(v[0])} (${cnt(k)})</option>`).join("")}</select>
         <label class="chk"><input type="checkbox" id="auOnly" ${A.only ? "checked" : ""}> Only PIDs with stock left</label><span class="count">${inr(list.length, 0)} lines</span></div>
@@ -88,7 +90,7 @@
         <td class="code">${esc(r.billBatch || "—")}</td><td class="dhh">${r.pid ? `<a class="codelink" data-aupid="${esc(r.pid)}">${esc(r.pid)}</a>` : "—"}</td><td class="code">${esc(r.pidBatch || "—")}</td>
         <td>${ST[r.st][1] ? `<span class="pill ${ST[r.st][1]}">${esc(ST[r.st][0])}</span>` : esc(ST[r.st][0])}</td>
         <td class="num">${inr(r.qty, 0)}${r.free ? ' <span class="note">free</span>' : ""}</td><td class="num">${r.bought == null ? "" : inr(r.bought, 0)}</td><td class="num">${r.sold == null ? "" : inr(r.sold, 0)}</td>
-        <td class="num">${r.left == null ? "" : `<b>${inr(r.left, 0)}</b>`}</td><td class="code">${esc(r.supInv || "")}</td><td>${canPick() && r.st !== "exact" ? (A.pick === r.id + "#" + r.li ? pickerHtml(r) : `<button class="btn" data-aupick="${esc(r.id)}#${r.li}">Pick PID</button>`) : r.hand ? '<span class="note">picked by hand</span>' : ""}</td></tr>`).join("") : `<tr><td colspan="14" class="empty">No lines.</td></tr>`}
+        <td class="num">${r.left == null ? "" : `<b>${inr(r.left, 0)}</b>`}</td><td class="code">${esc(r.supInv || "")}</td><td>${canPick() && r.st !== "exact" ? (A.pick === r.id + "#" + r.li ? pickerHtml(r) : r.st === "hand" ? `<span class="note">picked by hand</span> <button class="btn" data-aupick="${esc(r.id)}#${r.li}">Change</button>` : `<button class="btn" data-aupick="${esc(r.id)}#${r.li}">Pick PID</button>`) : r.hand ? '<span class="note">picked by hand</span>' : ""}</td></tr>`).join("") : `<tr><td colspan="14" class="empty">No lines.</td></tr>`}
       </tbody></table></div></div>`;
     A.list = list;
   }
