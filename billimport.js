@@ -15,28 +15,24 @@
     while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++e > 1) return false;
       if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
     return e + (a.length - i) + (b.length - j) <= 1; }
-  function batchScore(bill, stock) { const a = nz(bill), b = nz(stock); if (!a || !b) return 0; if (a === b) return 3;
-    const x = bz(bill), y = bz(stock); if (x === y) return 2;
-    if (Math.min(x.length, y.length) >= 6 && Math.abs(x.length - y.length) <= 2 && (x.includes(y) || y.includes(x))) return 2;   // printed cut short (BPVASS000 / BPVASS0004)
-    if (Math.min(x.length, y.length) >= 6 && lev1(x, y)) return 1; return 0; }
+  /* EXACT batch only: the batch printed on the DHH bill must be the PID's batch, character for character
+     (only spaces, dashes and capital/small letters are ignored). Nothing else is matched. */
+  const bx = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function batchScore(bill, stock) { const a = bx(bill), b = bx(stock); return a && a === b ? 3 : 0; }
   /* Stock that could be this bill line: the same material code, plus — when the bill's code is missing or
      typed differently (TPRAQ-01 / TPRAQ1-01, GGTSR01 / GGTFSR-01, HBAT1A / HBATIA) — any PID whose batch
      is the same as the batch on the bill. A batch number is specific enough to identify the product. */
   const codeless = c => { const x = nz(c); return !x || /^0+$/.test(x) || x.length < 4; };
   const codeSim = (a, b) => { const x = bz(a), y = bz(b); return x === y || lev1(x, y) || (Math.min(x.length, y.length) >= 6 && (x.includes(y) || y.includes(x))); };
-  function poolFor(l, byMat) {
-    const own = codeless(l.mat) ? [] : (byMat[nz(l.mat)] || []); const bb = l.billBatch || l.batch;
-    if (!bb || nz(bb).length < 5) return own;
-    const extra = S.items.filter(r => !own.includes(r) && r.batch && (batchScore(bb, r.batch) >= 2 ? (codeless(l.mat) || codeSim(l.mat, r.mat)) : (codeless(l.mat) && nz(bb).length >= 8 && batchScore(bb, r.batch) >= 1)));
-    return own.concat(extra);
+  function poolFor(l) {                              // every PID with exactly the bill's batch; product code is not used
+    const bb = bx(l.billBatch || l.batch); if (!bb) return [];
+    return S.items.filter(r => bx(r.batch) === bb);
   }
   /* Order stock for a bill line: best batch match first, then the oldest purchase. Stock bought after the bill
      is skipped, except the same batch (a supplier invoice can be dated a little after the goods arrived): up to 31 days. */
   function candidatesFor(list, l, billYmd) {
-    const lim = (() => { const d = new Date(billYmd.slice(0, 4) + "-" + billYmd.slice(4, 6) + "-" + billYmd.slice(6, 8)); d.setDate(d.getDate() + 31); return d.toISOString().slice(0, 10).replace(/-/g, ""); })();
     return (list || []).map(r => ({ r, s: batchScore(l.batch, r.batch), pd: ymd(r.invoiceDate) }))
-      .filter(x => x.s >= 2)                         // EXACT product + batch only; anything else is picked by hand in Batch audit
-      .filter(x => x.pd === "99999999" || x.pd <= billYmd || x.pd <= lim)
+      .filter(x => x.s >= 3)                         // exact batch only
       .sort((a, b) => b.s - a.s || a.pd.localeCompare(b.pd) || String(a.r.key).localeCompare(String(b.r.key))).map(x => x.r);
   }
 
@@ -154,7 +150,7 @@
         const bb = billBatchOf(orig); const cur = orig.key ? byKey[orig.key] : null;
         const curScore = cur ? batchScore(bb, cur.batch) : -1;
         // A: no stock yet → link.  B: linked to a different batch while a better match for the bill's batch now exists → move.
-        const mode = orig.noStock ? "A" : (cur && bb && curScore < 3 && !orig.handPicked ? "B" : "");
+        const mode = orig.noStock ? "A" : (cur && bb && curScore < 3 ? "B" : "");
         if (!mode) { lines.push(orig); continue; } any = true;
         const qty = +orig.qty || 0; const l = { ...orig, batch: bb };
         if (mode === "B") sold[cur.key] = r2((sold[cur.key] || 0) - qty);          // release its current stock while we look
@@ -165,8 +161,8 @@
           parts.push({ ...orig, mat: r.mat || orig.mat, billMat: orig.billMat || orig.mat || "", key: r.key, pid: r.dhhId || "", purchaseInvoice: r.invoiceNo, purchaseSr: r.sr, batch: r.batch || bb, billBatch: bb, serial: r.serial || "", exp: r.exp || orig.exp || "", hsn: r.hsn || orig.hsn, uom: r.uom || orig.uom || "", qty: q, cost: costOfItem(r), noStock: false,
             remarks: [orig.rate ? "" : "Free", bb && nz(r.batch) !== nz(bb) ? `bill batch ${bb}` : "", mode === "A" ? "linked later" : "re-matched by batch"].filter(Boolean).join(" · ") }); }
         const restore = () => { if (mode === "B") sold[cur.key] = r2((sold[cur.key] || 0) + qty); };
-        if (!parts.length && mode === "B" && curScore < 2 && !orig.handPicked) {   // on a different batch and no exact batch in D Cart: take it off that PID
-          const un = finish({ ...orig, key: "", pid: "", purchaseInvoice: "", purchaseSr: "", serial: "", batch: bb, billBatch: bb, noStock: true, remarks: [orig.rate ? "" : "Free", "no exact batch in D Cart: pick it in Batch audit"].filter(Boolean).join(" · ") });
+        if (!parts.length && mode === "B") {   // on a different batch and no exact batch in D Cart: take it off that PID
+          const un = finish({ ...orig, key: "", pid: "", purchaseInvoice: "", purchaseSr: "", serial: "", batch: bb, billBatch: bb, noStock: true, remarks: [orig.rate ? "" : "Free", "bill batch not in D Cart"].filter(Boolean).join(" · ") });
           if (Math.abs(un.taxable - calcLine(orig, true, {}).taxable) < 0.001) { lines.push(un); unlinked += qty; changed = true; continue; }
         }
         if (!parts.length) { restore(); lines.push(orig); if (mode === "A") left += qty; continue; }
@@ -191,20 +187,20 @@
     const P = LK.plan.out; LK.busy = true; let n = 0; drawLink();
     try { for (const p of P) { const doc = { ...p.d, lines: p.lines, totals: p.totals, relinkedAt: new Date().toISOString() };
         await S.db.doc(`sales/${p.id}`).set(doc); S.sales[p.id] = doc; n++; LK.msg = `Saving… ${n} of ${P.length}`; drawLink(); }
-      LK.msg = `Done: ${n} bill${n === 1 ? "" : "s"} updated: ${inr(P.reduce((a, p) => a + p.linked, 0), 0)} pieces newly taken out of stock, ${inr(P.reduce((a, p) => a + p.moved, 0), 0)} moved to the bill's own batch, ${inr(P.reduce((a, p) => a + (p.unlinked || 0), 0), 0)} taken off a wrong batch (pick them in Batch audit).`; LK.plan = null;
+      LK.msg = `Done: ${n} bill${n === 1 ? "" : "s"} updated: ${inr(P.reduce((a, p) => a + p.linked, 0), 0)} pieces newly taken out of stock, ${inr(P.reduce((a, p) => a + p.moved, 0), 0)} moved to the bill's own batch, ${inr(P.reduce((a, p) => a + (p.unlinked || 0), 0), 0)} taken off a wrong batch (no PID with the bill's batch).`; LK.plan = null;
     } catch (e) { LK.msg = `Stopped after ${n} bill${n === 1 ? "" : "s"}: ${e.message || e.code}. Click "Check" again; bills already linked are skipped.`; }
     LK.busy = false; if (typeof computeStock === "function") computeStock(S.items); drawLink(); if (typeof renderSalesList === "function" && $("salestbl")) renderSalesList();
   }
   function drawLink() {
     const box = $("impBox"); if (!box) return; const P = LK.plan;
     let h = `<div class="row" style="justify-content:space-between"><h3 style="margin:0">Link past bills to stock</h3><button class="btn" data-lk="close">Close</button></div>
-      <p class="note" style="margin:6px 0 10px" >Each bill line is marked sold on the <b>exact product and batch printed on the bill</b> (letters like I/1 and O/0, and a batch cut short by a digit, count as the same). Nothing is matched to a different batch any more: lines linked to another batch move to their own batch, or are taken off it and listed in <b>Batch audit</b> for you to pick. Stock bought after the bill date is used only for the same batch, up to 31 days later. Bill amounts don't change. Nothing is saved until you click the button below.</p>
+      <p class="note" style="margin:6px 0 10px" >Each bill line is marked sold on the <b>exact batch printed on the bill</b>, character for character. Nothing else is matched: not the product code, not look-alike or cut-short batches. A line whose batch isn't in D Cart is left unmarked and listed in <b>Batch audit</b>. Bill amounts don't change. Nothing is saved until you click the button below.</p>
       <div class="row"><button class="btn primary" data-lk="check" ${LK.busy ? "disabled" : ""}>Check</button></div>`;
     if (P) {
       const pcs = P.out.reduce((a, p) => a + p.linked, 0), mv = P.out.reduce((a, p) => a + p.moved, 0), left = P.out.reduce((a, p) => a + p.left, 0), un = P.out.reduce((a, p) => a + (p.unlinked || 0), 0);
       h += `<div class="row" style="gap:18px;margin:12px 0;flex-wrap:wrap"><div><div class="note">Bills to update</div><b>${P.out.length}</b> <span class="note">of ${P.docs} to look at</span></div>
         <div><div class="note">Pieces newly taken out of stock</div><b>${inr(pcs, 0)}</b></div><div><div class="note">Pieces moved to the bill's own batch</div><b>${inr(mv, 0)}</b></div><div><div class="note">Taken off a wrong batch</div><b>${inr(un, 0)}</b></div><div><div class="note">Still without stock on those bills</div><b>${inr(left, 0)}</b></div></div>
-        ${un ? `<p class="note">Pieces taken off a wrong batch go back into that PID's stock and wait in <b>Inventory → Batch audit</b>, where you pick the exact PID by hand.</p>` : ""}
+        ${un ? `<p class="note">Pieces taken off a wrong batch go back into that PID's stock and wait in <b>Inventory → Batch audit</b>, until a PID with exactly that batch is in D Cart.</p>` : ""}
         ${P.skippedRound ? `<p class="note">${P.skippedRound} line${P.skippedRound === 1 ? "" : "s"} left as they are, because splitting them would change a bill by a few paise.</p>` : ""}
         ${P.out.length ? `<details style="margin:8px 0"><summary class="note" style="cursor:pointer">See each bill</summary><div class="tablewrap" style="max-height:360px"><table><thead><tr><th>Bill</th><th>Date</th><th>Customer</th><th class="num">Linked</th><th class="num">Moved to bill batch</th><th class="num">Still no stock</th></tr></thead><tbody>
         ${P.out.map(p => `<tr><td class="code">${esc(p.d.no)}</td><td>${esc(dmy(p.d.date))}</td><td>${esc(p.d.customer?.name || "")}</td><td class="num">${inr(p.linked, 0)}</td><td class="num">${inr(p.moved, 0)}</td><td class="num">${inr(p.left, 0)}</td></tr>`).join("")}</tbody></table></div></details>
