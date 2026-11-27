@@ -25,14 +25,24 @@
   const wrapQuerySnap = q => ({ docs: q.docs.map(wrapDocSnap), size: q.size, empty: q.empty, metadata: { fromCache: q.metadata.fromCache, hasPendingWrites: q.metadata.hasPendingWrites }, docChanges: () => q.docChanges() });
   const err = e => ({ code: e.code === "permission-denied" ? "invalid_argument" : (e.code || "unavailable"), message: e.message || String(e) });
 
+  /* Activity log: after each successful save / edit / delete, activity.js (window.DCLOG) records who did what.
+     Counters, locks and the stock chunks are internal and not logged. */
+  const NOLOG = /^(activity|locks|chunks|registry|presets)\/|^settings\/(salescounters|counters)$/;
+  async function logged(op, path, data, run) {
+    const on = typeof window.DCLOG === "function" && !NOLOG.test(path); let before;
+    if (on) { try { before = await fs.doc(path).get({ source: "cache" }).then(s => s.exists ? s.data() : null); } catch (e) { before = undefined; } }
+    const out = await run();
+    if (on) { try { window.DCLOG(op, path, data, before, auth.currentUser, rec => fs.collection("activity").add(rec)); } catch (e) { console.warn("Activity log:", e); } }
+    return out;
+  }
   function docRef(path) {
     const r = fs.doc(path);
     return {
       id: r.id, path,
       get: () => r.get().then(wrapDocSnap).catch(e => { throw err(e); }),
-      set: d => r.set(d).catch(e => { throw err(e); }),
-      update: d => r.update(d).catch(e => { throw err(e); }),
-      delete: () => r.delete().catch(e => { throw err(e); }),
+      set: d => logged("set", path, d, () => r.set(d)).catch(e => { throw err(e); }),
+      update: d => logged("update", path, d, () => r.update(d)).catch(e => { throw err(e); }),
+      delete: () => logged("delete", path, null, () => r.delete()).catch(e => { throw err(e); }),
       onSnapshot: (next, onErr) => r.onSnapshot({ includeMetadataChanges: true }, s => next(wrapDocSnap(s)), e => onErr && onErr(err(e))),
       collection: sub => collRef(path + "/" + sub),
       acquire: async ({ holder, ttlMs = 30000 }) => {
